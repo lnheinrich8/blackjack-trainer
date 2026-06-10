@@ -148,6 +148,8 @@ function Trainer({ onResult }) {
         <DrillStatus label={labelFor(activeDifficulty)} details={details} />
       </div>
 
+      <div className="trainer__spacer trainer__spacer--top" aria-hidden="true" />
+
       {running ? (
         <TableDrill
           key={runId}
@@ -170,6 +172,8 @@ function Trainer({ onResult }) {
           </div>
         </div>
       )}
+
+      <div className="trainer__spacer trainer__spacer--bottom" aria-hidden="true" />
 
       {modalOpen && (
         <ConfigModal
