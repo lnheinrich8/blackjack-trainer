@@ -1,0 +1,759 @@
+:root {
+  --bg: #0a1410; /* deep felt black-green */
+  --panel: #122019; /* felt panel */
+  --panel-2: #25392e; /* borders / lighter felt */
+  --text: #f3ecd9; /* ivory */
+  --muted: #9aa99d; /* sage */
+  --accent: #d4af37; /* casino gold */
+  --win: #4cb86a;
+  --lose: #d23b36; /* casino red */
+  --card-red: #b62b1f;
+  --card-black: #161616;
+  --ink: #1a1206; /* dark text on gold */
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--bg);
+  background-image: radial-gradient(
+    ellipse at 50% -10%,
+    #163024 0%,
+    rgba(10, 20, 16, 0) 55%
+  );
+  color: var(--text);
+  overflow-x: hidden; /* guard against the full-bleed top bar's 100vw math */
+  -webkit-user-select: none; /* nothing in the UI is selectable/highlightable… */
+  user-select: none;
+}
+
+/* …except the editable fields, so they stay usable. */
+input,
+textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* A classic display serif for headings & the brand gives the casino feel. */
+h1,
+h2,
+h3,
+.topnav__brand,
+.drillstatus__toggle {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: 0.02em;
+}
+
+/* ---- site shell ---- */
+.site {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- top nav ---- */
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.9rem 1.5rem;
+  background: var(--panel);
+  border-bottom: 1px solid rgba(212, 175, 55, 0.25);
+}
+
+.topnav__brand {
+  font-weight: 700;
+  font-size: 1.15rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  white-space: nowrap;
+}
+
+.topnav__links {
+  display: flex;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.topnav__link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.95rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.topnav__link:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+
+.topnav__link.is-active {
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.topnav__link:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+.topnav__soon {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--panel-2);
+  color: var(--muted);
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+}
+
+.topnav__glance {
+  color: var(--muted);
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .topnav {
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+  .topnav__glance,
+  .topnav__soon {
+    display: none;
+  }
+}
+
+/* ---- centered stage ---- */
+.site__main {
+  flex: 1;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* Stats stays narrow & centered; the trainer/table uses the full width. */
+.stats {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-2);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+/* ---- config form ---- */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.field span {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.field input,
+.field select {
+  padding: 0.5rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-2);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+/* ---- buttons ---- */
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.1rem;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--ink);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--panel-2);
+  margin-top: 1rem;
+}
+
+/* ---- card ---- */
+.card {
+  width: 120px;
+  height: 168px;
+  background: #f7f1e3;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.card--placeholder {
+  background: var(--panel-2);
+}
+
+.card--red {
+  color: var(--card-red);
+}
+
+.card--black {
+  color: var(--card-black);
+}
+
+.card__rank {
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.card__suit {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+
+/* ---- guess ---- */
+.guess {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.guess input {
+  width: 140px;
+  text-align: center;
+  font-size: 1.5rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--panel-2);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ---- error ---- */
+.error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+/* ---- stats ---- */
+.stats__summary {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.stats__value {
+  display: block;
+  font-size: 1.8rem;
+  font-weight: 700;
+}
+
+.stats__label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.stats h3 {
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.stats__empty {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.stats__history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.stats__history li {
+  display: grid;
+  grid-template-columns: 1.2rem 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.stats__history li.ok span:first-child {
+  color: var(--win);
+}
+
+.stats__history li.bad span:first-child {
+  color: var(--lose);
+}
+
+.stats__meta {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ---- blackjack table ---- */
+.table {
+  width: 100%;
+  background: radial-gradient(
+    ellipse at 50% 35%,
+    #1b7a46 0%,
+    #14552f 55%,
+    #0d3d22 100%
+  );
+  border: 8px solid #3d2412;
+  border-radius: 220px;
+  padding: 2rem 1.5rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.5rem;
+  min-height: 340px;
+  box-shadow: inset 0 0 0 3px rgba(212, 175, 55, 0.3),
+    inset 0 0 70px rgba(0, 0, 0, 0.5);
+}
+
+.table__dealer {
+  display: flex;
+  justify-content: center;
+}
+
+.table__players {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 2rem;
+  width: 100%;
+}
+
+/* a seat = a table spot (flag + that hand's cards), not a literal chair */
+.seat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.45rem;
+  border-radius: 12px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.seat__cards {
+  display: flex;
+  align-items: center;
+  min-height: 76px;
+}
+
+/* Cards overlap slightly to the side — not enough to hide the earlier card's
+   centered rank/suit. */
+.seat__cards .card {
+  margin-left: -14px;
+}
+
+.seat__cards .card:first-child {
+  margin-left: 0;
+}
+
+.seat__empty {
+  width: 54px;
+  height: 76px;
+  border: 2px dashed rgba(212, 175, 55, 0.3);
+  border-radius: 6px;
+}
+
+.seat__flag {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* active = a blue outline ring around the player's number tag */
+.seat--active .seat__flag {
+  box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.seat--user .seat__flag {
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* smaller cards on the table than in the solo drill */
+.seat .card {
+  width: 54px;
+  height: 76px;
+  border-radius: 6px;
+  gap: 0;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+}
+
+.seat .card__rank,
+.seat .card__suit {
+  font-size: 1.15rem;
+}
+
+/* ---- trainer: mode menu ---- */
+.modemenu {
+  text-align: center;
+}
+
+.modemenu__title {
+  margin: 0 0 0.25rem;
+}
+
+.modemenu__subtitle {
+  color: var(--muted);
+  margin: 0 0 1.5rem;
+}
+
+.modemenu__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.modecard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  align-items: flex-start;
+  text-align: left;
+  padding: 1.1rem;
+  border: 1px solid var(--panel-2);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.modecard:hover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.modecard__label {
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.modecard__blurb {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.modecard--dynamic {
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+.modecard--custom {
+  border-style: dashed;
+}
+
+/* ---- trainer: custom form ---- */
+.customform {
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.customform__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+.customform__actions .btn--ghost {
+  margin-top: 0;
+}
+
+/* ---- trainer: table drill ---- */
+.tabledrill {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.tabledrill__stage {
+  position: relative;
+}
+
+/* Top bar full-bleeds to the page edges: controls hard-left, status hard-right,
+   while the table below stays within the centered column. */
+.trainer__bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  padding: 0 1.5rem;
+}
+
+.drillstatus {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.drillstatus__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+
+.drillstatus__caret {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.drillstatus__details {
+  list-style: none;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: right;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* the deal/prompt/feedback belt under the table */
+.tabledrill__belt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 64px;
+}
+
+.belt__msg {
+  color: var(--muted);
+  margin: 0;
+}
+
+.belt__msg--hint {
+  font-style: italic;
+}
+
+.countbelt {
+  width: 100%;
+  max-width: 420px;
+}
+
+.feedback {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+}
+
+.feedback h2 {
+  margin: 0 0 0.75rem;
+}
+
+.feedback--win h2 {
+  color: var(--win);
+}
+
+.feedback--lose h2 {
+  color: var(--lose);
+}
+
+.feedback__line {
+  margin: 0.25rem 0;
+}
+
+.feedback__note {
+  color: var(--accent);
+  font-weight: 600;
+  margin: 0.6rem 0 1rem;
+}
+
+/* ---- trainer: page controls + config modal ---- */
+.trainer {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.trainer__controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.trainer__controls .btn {
+  margin-top: 0;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.modal__panel {
+  background: var(--panel);
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 460px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.modal__header h2 {
+  margin: 0;
+}
+
+.modal__close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+.modal__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.modal__note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin: 1rem 0 0;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1.5rem;
+}
+
+.badge {
+  background: var(--accent);
+  color: var(--ink);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+}
+
+.difficulty-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.difficulty {
+  border: 1px solid var(--panel-2);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.difficulty:hover {
+  border-color: var(--accent);
+}
+
+.difficulty.is-active {
+  background: var(--accent);
+  color: var(--ink);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+
+.config-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.config-fields .field {
+  margin-bottom: 0;
+}

@@ -1,21 +1,57 @@
-import { useState } from 'react'
-import { getHealth } from './api/client'
+import { useState } from "react";
+import Trainer from "./features/trainer/Trainer";
+import Stats from "./features/stats/Stats";
+import TopNav from "./features/shared/components/TopNav";
+import { useLocalStorage } from "./features/shared/hooks/useLocalStorage";
+
+const DEFAULT_STATS = { totalDrills: 0, totalCorrect: 0, history: [] };
+const HISTORY_LIMIT = 20;
 
 function App() {
-    const [health, setHealth] = useState(null);
+  // Stats persist to localStorage, so a returning user keeps their progress.
+  const [stats, setStats] = useLocalStorage("bjack.stats", DEFAULT_STATS);
+  const [section, setSection] = useState("train");
 
-    const healthCheck = () => {
-        getHealth()
-            .then((data) => setHealth(data.status))
-            .catch((err) => setHealth("error: " + err.message));
-    };
+  // Called when a count is graded — fold the result into lifetime stats and the
+  // capped recent-history list.
+  const recordResult = (result, config) => {
+    setStats((prev) => ({
+      totalDrills: prev.totalDrills + 1,
+      totalCorrect: prev.totalCorrect + (result.correct ? 1 : 0),
+      history: [
+        {
+          guessed: result.guessedCount,
+          correct: result.correctCount,
+          isCorrect: result.correct,
+          numDecks: config.numDecks,
+          numCards: config.numCards,
+        },
+        ...prev.history,
+      ].slice(0, HISTORY_LIMIT),
+    }));
+  };
 
-    return (
-        <>
-            <button onClick={healthCheck}>health</button>
-            <p>{health}</p>
-        </>
-    )
+  const resetStats = () => setStats(DEFAULT_STATS);
+
+  const accuracy =
+    stats.totalDrills === 0
+      ? "—"
+      : `${Math.round((stats.totalCorrect / stats.totalDrills) * 100)}%`;
+
+  return (
+    <div className="site">
+      <TopNav
+        active={section}
+        onSelect={setSection}
+        glance={`${accuracy} · ${stats.totalDrills} counts`}
+      />
+
+      <main className="site__main">
+        {section === "train" && <Trainer onResult={recordResult} />}
+        {section === "stats" && <Stats stats={stats} onReset={resetStats} />}
+      </main>
+    </div>
+  );
 }
 
-export default App
+export default App;
