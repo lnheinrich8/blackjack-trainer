@@ -11,14 +11,7 @@ function CountPrompt({ onSubmit, busy }) {
   };
 
   return (
-    <div className="panel countbelt">
-      <GuessInput
-        value={value}
-        onChange={setValue}
-        onSubmit={submit}
-        busy={busy}
-      />
-    </div>
+    <GuessInput value={value} onChange={setValue} onSubmit={submit} busy={busy} />
   );
 }
 

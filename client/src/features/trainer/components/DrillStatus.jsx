@@ -26,7 +26,6 @@ function DrillStatus({ label, details }) {
         aria-expanded={open}
       >
         {label}
-        <span className="drillstatus__caret">{open ? "▲" : "▼"}</span>
       </button>
 
       {open && (

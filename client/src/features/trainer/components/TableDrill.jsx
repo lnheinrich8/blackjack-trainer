@@ -285,6 +285,11 @@ function TableDrill({ controller, onConfigChange, onResult }) {
             onContinue={() => dispatch({ type: "CONTINUE" })}
           />
         )}
+
+        <p className="belt__keys">
+          Press <strong>R</strong> to restart · <strong>Esc</strong> to stop the
+          drill.
+        </p>
       </div>
     </section>
   );

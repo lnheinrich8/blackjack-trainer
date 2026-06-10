@@ -254,18 +254,40 @@ h3,
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 1.25rem;
+}
+
+.guess__row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.guess__label {
+  font-size: 1.2rem;
+  color: var(--text);
 }
 
 .guess input {
-  width: 140px;
+  width: 80px;
   text-align: center;
-  font-size: 1.5rem;
-  padding: 0.5rem;
+  font-size: 1.1rem;
+  padding: 0.35rem 0.4rem;
   border-radius: 8px;
   border: 1px solid var(--panel-2);
   background: var(--bg);
   color: var(--text);
+}
+
+.guess__hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.guess__hint strong {
+  color: var(--accent);
 }
 
 /* ---- error ---- */
@@ -543,6 +565,7 @@ h3,
 }
 
 .drillstatus {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -561,21 +584,25 @@ h3,
   cursor: pointer;
 }
 
-.drillstatus__caret {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
 .drillstatus__details {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 10;
   list-style: none;
   margin: 0.5rem 0 0;
-  padding: 0;
+  padding: 0.6rem 0.8rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
   text-align: right;
   color: var(--muted);
   font-size: 0.9rem;
+  background: var(--panel);
+  border: 1px solid var(--panel-2);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
 }
 
 /* the deal/prompt/feedback belt under the table */
@@ -595,9 +622,15 @@ h3,
   font-style: italic;
 }
 
-.countbelt {
-  width: 100%;
-  max-width: 420px;
+.belt__keys {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0.75rem 0 0;
+  opacity: 0.8;
+}
+
+.belt__keys strong {
+  color: var(--accent);
 }
 
 .feedback {

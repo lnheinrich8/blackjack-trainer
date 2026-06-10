@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { DIFFICULTIES } from "../modes";
 
+// Bounds for the dealing-speed field, in seconds per card.
+const SPEED_MIN_S = 0.2;
+const SPEED_MAX_S = 5;
+
 // The Configure modal: pick a difficulty (which fills in concrete values) or
 // edit any specific value — editing flips the selection to "Custom". Dynamic
 // hides the values since they change as you play. All changes are pushed up to
@@ -22,6 +26,12 @@ function ConfigModal({
   );
   const [prevRevealMs, setPrevRevealMs] = useState(config.revealMs);
 
+  // Same idea for "hands before count": keep the raw text so the user can clear
+  // the field and type freely (e.g. backspace to empty on the way to "2")
+  // without it snapping to 1 mid-edit. We clamp to bounds on blur instead.
+  const [handsText, setHandsText] = useState(config.handsUntilAsked.toString());
+  const [prevHands, setPrevHands] = useState(config.handsUntilAsked);
+
   // Re-sync the speed text when revealMs changes from OUTSIDE (e.g. picking a
   // preset) — but not when the change came from this field's own typing (those
   // already match). React's "adjust state during render" pattern, no effect.
@@ -33,13 +43,51 @@ function ConfigModal({
     }
   }
 
+  // Likewise re-sync the hands text on outside changes (preset selection).
+  if (config.handsUntilAsked !== prevHands) {
+    setPrevHands(config.handsUntilAsked);
+    if (parseInt(handsText, 10) !== config.handsUntilAsked) {
+      setHandsText(config.handsUntilAsked.toString());
+    }
+  }
+
   const handleSpeed = (e) => {
     const text = e.target.value;
     setSpeedText(text);
     const seconds = parseFloat(text);
-    if (!Number.isNaN(seconds) && seconds > 0) {
+    if (!Number.isNaN(seconds) && seconds >= SPEED_MIN_S && seconds <= SPEED_MAX_S) {
       set({ revealMs: Math.round(seconds * 1000) });
     }
+  };
+
+  // On blur, settle the speed: empty falls back to the minimum, otherwise clamp
+  // into range — below the minimum becomes 0.2s, above the maximum becomes 5s.
+  const commitSpeed = () => {
+    const seconds = parseFloat(speedText);
+    const settled = Number.isNaN(seconds)
+      ? SPEED_MIN_S
+      : Math.max(SPEED_MIN_S, Math.min(SPEED_MAX_S, seconds));
+    setSpeedText(settled.toString());
+    const ms = Math.round(settled * 1000);
+    if (ms !== config.revealMs) set({ revealMs: ms });
+  };
+
+  const handleHands = (e) => {
+    const text = e.target.value;
+    setHandsText(text);
+    const n = parseInt(text, 10);
+    if (!Number.isNaN(n) && n >= 1 && n <= 15) {
+      set({ handsUntilAsked: n });
+    }
+  };
+
+  // On blur, settle the field: empty falls back to 1, otherwise clamp into
+  // range — below the minimum becomes 1, above the maximum becomes 15.
+  const commitHands = () => {
+    const n = parseInt(handsText, 10);
+    const settled = Number.isNaN(n) ? 1 : Math.max(1, Math.min(15, n));
+    setHandsText(settled.toString());
+    if (settled !== config.handsUntilAsked) set({ handsUntilAsked: settled });
   };
 
   return (
@@ -108,10 +156,12 @@ function ConfigModal({
               <span>Dealing speed (s)</span>
               <input
                 type="number"
-                min={0.1}
+                min={SPEED_MIN_S}
+                max={SPEED_MAX_S}
                 step={0.1}
                 value={speedText}
                 onChange={handleSpeed}
+                onBlur={commitSpeed}
               />
             </label>
 
@@ -121,15 +171,9 @@ function ConfigModal({
                 type="number"
                 min={1}
                 max={15}
-                value={config.handsUntilAsked}
-                onChange={(e) =>
-                  set({
-                    handsUntilAsked: Math.max(
-                      1,
-                      Math.min(15, Number(e.target.value) || 1),
-                    ),
-                  })
-                }
+                value={handsText}
+                onChange={handleHands}
+                onBlur={commitHands}
               />
             </label>
           </div>
