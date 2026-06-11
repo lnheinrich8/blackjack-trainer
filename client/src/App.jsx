@@ -11,7 +11,7 @@ const HISTORY_LIMIT = 20;
 function App() {
   // Stats persist to localStorage, so a returning user keeps their progress.
   const [stats, setStats] = useLocalStorage("bjack.stats", DEFAULT_STATS);
-  const [section, setSection] = useState("train");
+  const [section, setSection] = useState("play");
 
   // Called when a count is graded — fold the result into lifetime stats and the
   // capped recent-history list.

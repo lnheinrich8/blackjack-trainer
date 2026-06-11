@@ -1,9 +1,12 @@
 // The user enters their running count. The running count can be negative, so we
-// accept a signed integer. There's no button — Enter submits.
+// accept a signed integer. There's no button — Spacebar submits.
 
 function GuessInput({ value, onChange, onSubmit, busy }) {
   const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !busy) onSubmit();
+    if (e.key === " " && !busy) {
+      e.preventDefault(); // don't type a space into the field
+      onSubmit();
+    }
   };
 
   return (
@@ -26,7 +29,7 @@ function GuessInput({ value, onChange, onSubmit, busy }) {
           "Checking…"
         ) : (
           <>
-            Press <strong>Enter</strong> to submit your count.
+            Press <strong>Spacebar</strong> to submit your count.
           </>
         )}
       </p>

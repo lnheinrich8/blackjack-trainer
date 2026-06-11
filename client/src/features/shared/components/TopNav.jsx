@@ -3,8 +3,8 @@
 // multi hand) will live inside the Train page, not as top-level nav.
 
 const NAV_ITEMS = [
-  { id: "train", label: "Train", enabled: true },
   { id: "play", label: "Play", enabled: true },
+  { id: "train", label: "Train", enabled: true },
   { id: "stats", label: "Stats", enabled: true },
   { id: "coach", label: "Coach", enabled: false },
   { id: "settings", label: "Settings", enabled: false },

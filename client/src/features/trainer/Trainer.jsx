@@ -96,8 +96,8 @@ function Trainer({ onResult }) {
 
   const running = run !== null;
 
-  // Keyboard controls: Enter starts the drill when idle; while it's running R
-  // restarts and Esc stops it. Ignore Enter/R while typing (e.g. the count
+  // Keyboard controls: Spacebar starts the drill when idle; while it's running R
+  // restarts and Esc stops it. Ignore Spacebar/R while typing (e.g. the count
   // input) so they don't fire mid-guess; Esc always stops. The Configure modal
   // owns its own keys, so skip the global handler while it's open.
   useEffect(() => {
@@ -106,7 +106,10 @@ function Trainer({ onResult }) {
       const tag = e.target.tagName;
       const typing = tag === "INPUT" || tag === "TEXTAREA";
       if (!running) {
-        if (e.key === "Enter" && !typing) start();
+        if (e.key === " " && !typing) {
+          e.preventDefault(); // stop the page from scrolling on space
+          start();
+        }
         return;
       }
       if (e.key === "Escape") stop();
@@ -140,8 +143,12 @@ function Trainer({ onResult }) {
     <section className="trainer">
       <div className="trainer__bar">
         <div className="trainer__controls">
-          <button className="btn btn--ghost" onClick={() => setModalOpen(true)}>
-            ⚙ Configure
+          <button
+            className="trainer__configure"
+            onClick={() => setModalOpen(true)}
+            aria-label="Configure"
+          >
+            ⚙
           </button>
         </div>
 
@@ -167,7 +174,7 @@ function Trainer({ onResult }) {
           </div>
           <div className="tabledrill__belt">
             <p className="belt__keys">
-              Press the <strong>Enter</strong> key to start the drill.
+              Press the <strong>Spacebar</strong> to start the drill.
             </p>
           </div>
         </div>

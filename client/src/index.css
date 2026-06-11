@@ -88,23 +88,30 @@ h3,
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  border: none;
+  border: 1px solid transparent; /* transparent border avoids layout shift */
   background: transparent;
   color: var(--text);
   font-size: 0.95rem;
   padding: 0.45rem 0.8rem;
   border-radius: 8px;
   cursor: pointer;
+  transition: background 0.2s ease-in-out, border-color 0.2s ease-in-out,
+    color 0.2s ease-in-out;
 }
 
 .topnav__link:hover:not(:disabled) {
   background: var(--panel-2);
 }
 
+/* Active page: gold outline (not filled), white text on the felt. */
 .topnav__link.is-active {
-  background: var(--accent);
-  color: var(--ink);
+  border-color: var(--accent);
   font-weight: 600;
+}
+
+/* Hovering the active button fills it with mostly-transparent gold. */
+.topnav__link.is-active:hover:not(:disabled) {
+  background: rgba(212, 175, 55, 0.18);
 }
 
 .topnav__link:disabled {
@@ -379,8 +386,11 @@ h3,
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* Dealer pinned to the top, players dropped to the bottom whenever there's
+     spare vertical space (a single row of hands). */
+  justify-content: space-between;
   gap: 2.5rem;
-  min-height: 340px;
+  min-height: 420px;
   box-shadow: inset 0 0 0 3px rgba(212, 175, 55, 0.3),
     inset 0 0 70px rgba(0, 0, 0, 0.5);
 }
@@ -563,7 +573,9 @@ h3,
   gap: 1rem;
   margin-left: calc(50% - 50vw);
   margin-right: calc(50% - 50vw);
-  padding: 0 1.5rem;
+  /* Horizontal padding matches .site__main's 2rem top padding, so the gear sits
+     the same distance from the window's left edge as from the menubar. */
+  padding: 0 2rem;
 }
 
 .drillstatus {
@@ -612,7 +624,11 @@ h3,
   display: flex;
   flex-direction: column;
   align-items: center;
-  min-height: 64px;
+  /* Reserve enough height for the tallest common belt (the Play betting controls)
+     so the table+belt block is the same height on both pages — keeping the table
+     in the same vertical position rather than riding higher when the belt is
+     taller. Content stays top-aligned, just under the table. */
+  min-height: 120px;
 }
 
 .belt__msg {
@@ -651,6 +667,9 @@ h3,
 
 .feedback--lose h2 {
   color: var(--lose);
+}
+.feedback--push h2 {
+  color: var(--muted);
 }
 
 .feedback__line {
@@ -697,8 +716,20 @@ h3,
   gap: 1rem;
 }
 
-.trainer__controls .btn {
-  margin-top: 0;
+/* Gear-only configure control: no border/background, brightens to white on hover. */
+.trainer__configure {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--muted);
+  font-size: 2.04rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.2s ease-in-out;
+}
+
+.trainer__configure:hover {
+  color: #fff;
 }
 
 .modal {
@@ -811,4 +842,333 @@ h3,
 
 .config-fields .field {
   margin-bottom: 0;
+}
+
+/* ---- Play (blackjack) ---- */
+
+/* Mirrors .trainer so the table floats ~1/4 down and re-attaches on overflow. */
+.play {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.play__bankroll {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+
+.play__result {
+  text-align: center;
+}
+
+.play__result h2 {
+  margin: 0 0 0.5rem;
+}
+
+.play__bankroll strong {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* A hand (dealer or player). Cards overlap like the trainer's seats. */
+.hand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.5rem;
+  border-radius: 12px;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.hand__cards {
+  display: flex;
+  align-items: flex-end; /* bottom-align so the empty square meets its tag with
+                            the same gap as the trainer's seats */
+  /* Sized to the (small) card height — no slack above, so the active-hand outline
+     hugs the cards. */
+  min-height: 76px;
+}
+
+/* Match the trainer's table cards (.seat .card): same small size and overlap. */
+.hand__cards .card {
+  width: 54px;
+  height: 76px;
+  border-radius: 6px;
+  gap: 0;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+  margin-left: -14px;
+}
+
+.hand__cards .card:first-child {
+  margin-left: 0;
+}
+
+.hand__cards .card__rank,
+.hand__cards .card__suit {
+  font-size: 1.15rem;
+}
+
+.hand__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hand__flag {
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: rgba(0, 0, 0, 0.35);
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.hand--user .hand__flag {
+  background: var(--accent);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.hand__total {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.hand__bet {
+  font-size: 0.8rem;
+  color: var(--accent);
+}
+
+/* The active player hand gets a gold ring; outcomes tint at settle. */
+.hand--active {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(212, 175, 55, 0.4);
+}
+
+.hand--win,
+.hand--blackjack {
+  box-shadow: 0 0 0 2px var(--win);
+}
+
+.hand--lose {
+  box-shadow: 0 0 0 2px var(--lose);
+}
+
+.hand--push {
+  box-shadow: 0 0 0 2px var(--muted);
+}
+
+/* Betting */
+.bet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  margin-top: 1rem;
+}
+
+/* Chips stay centered; the running bet floats to their right (absolutely
+   positioned) so its growing text never nudges the chip buttons. */
+.bet__line {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.bet__chips {
+  display: flex;
+  gap: 0.6rem;
+}
+
+/* Shared chip face — color comes from the .chip--<color> modifier; size differs
+   between the bet buttons (here) and the table tokens (.chip--token). */
+.chip {
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 3px dashed rgba(255, 255, 255, 0.55);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.chip--red {
+  background: #b1242a;
+  border-color: #e98b8e;
+}
+.chip--green {
+  background: #1d7a46;
+  border-color: #7ad6a0;
+}
+.chip--black {
+  background: #181818;
+  border-color: var(--accent);
+}
+.chip--purple {
+  background: #5b2a83;
+  border-color: #c79be8;
+}
+
+.bet__chips .chip {
+  cursor: pointer;
+  transition: transform 0.1s, filter 0.15s;
+}
+
+.bet__chips .chip:hover:not(:disabled) {
+  transform: translateY(-3px);
+  filter: brightness(1.15);
+}
+
+.bet__chips .chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.bet__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+/* Flash the "Add chips" hint when the player tries to deal with no bet down. */
+@keyframes betNudgeFlash {
+  0% {
+    color: inherit;
+    text-shadow: none;
+  }
+  30% {
+    color: #ff5a1f;
+    text-shadow: 0 0 4px rgba(255, 90, 31, 0.4);
+  }
+  70% {
+    color: #ff5a1f;
+    text-shadow: 0 0 4px rgba(255, 90, 31, 0.4);
+  }
+  100% {
+    color: inherit;
+    text-shadow: none;
+  }
+}
+
+.bet__nudge--flash {
+  animation: betNudgeFlash 2s ease-in-out;
+}
+
+.bet__amount {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-left: 2.5rem;
+  font-size: 1.1rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.bet__amount strong {
+  margin-left: 0.4rem;
+  color: var(--text);
+}
+
+/* Betting spot: the empty seat stays centered; chips float to its right
+   (absolutely positioned) so adding them doesn't shift the square. */
+.bet-spot {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.bet-spot .chipstacks {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 1.5rem;
+}
+
+/* Chip stacks drawn on the felt — one pile per denomination. */
+.chipstacks {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1.4rem;
+  min-height: 76px;
+}
+
+.chipstack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.chipstack:hover {
+  transform: translateY(-3px);
+}
+
+.chipstack:hover .chip--token {
+  filter: brightness(1.12);
+}
+
+.chipstack__pile {
+  position: relative;
+  width: 48px;
+}
+
+.chip--token {
+  position: absolute;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  font-size: 0.8rem;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.45);
+}
+
+.chipstack__count {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Player actions: keyboard hint, plus a transient reason when a move is blocked. */
+.actions-hint {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.actions-block {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #ff7a4d;
+  animation: actionsBlockFade 3s ease-in-out;
+}
+
+@keyframes actionsBlockFade {
+  0% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
