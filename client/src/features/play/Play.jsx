@@ -13,6 +13,16 @@ import PlayTable from "./components/PlayTable";
 import BetControls from "./components/BetControls";
 import RoundResult from "./components/RoundResult";
 import PlayConfigModal from "./components/PlayConfigModal";
+import { CHIP_DEFS } from "./chips";
+
+// Number-row / numpad hotkeys → chip value (1=$5, 2=$25, 3=$100, 4=$500). Keyed
+// by e.code so it's layout-independent and unaffected by Shift (which we read
+// separately to remove a chip instead of add).
+const CHIP_KEYS = {};
+CHIP_DEFS.forEach((chip, i) => {
+  CHIP_KEYS[`Digit${i + 1}`] = chip.value;
+  CHIP_KEYS[`Numpad${i + 1}`] = chip.value;
+});
 
 const DECKS = 6; // shoe size for the Play game
 const DEAL_MS = 450; // pause between cards of the opening deal
@@ -96,9 +106,9 @@ function Play() {
 
   const [modalOpen, setModalOpen] = useState(false);
 
-  // Keyboard controls. Spacebar deals / advances; during the player's turn
-  // Z=hit, X=stand, C=double, V=split. Trying to double/split when it isn't
-  // allowed shows a 3-second explanation instead.
+  // Keyboard controls. Spacebar deals / advances; during betting 1-4 add a chip
+  // (Shift+1-4 removes one); during the player's turn Z=hit, X=stand, C=double,
+  // V=split. Trying to double/split when it isn't allowed shows a 3s explanation.
   useEffect(() => {
     const onKey = (e) => {
       if (modalOpen) return; // the settings modal owns its own interactions
@@ -113,6 +123,24 @@ function Play() {
         } else if (state.phase === "settle") {
           e.preventDefault();
           dispatch({ type: "NEXT_ROUND" });
+        }
+        return;
+      }
+
+      // Chip hotkeys (betting only): 1-4 add a chip, Shift+1-4 remove one;
+      // 5 bets the whole bankroll (all in), Shift+5 clears the table.
+      if (state.phase === "betting") {
+        const value = CHIP_KEYS[e.code];
+        if (value) {
+          e.preventDefault();
+          dispatch(
+            e.shiftKey
+              ? { type: "REMOVE_CHIP", value }
+              : { type: "ADD_CHIP", value },
+          );
+        } else if (e.code === "Digit5" || e.code === "Numpad5") {
+          e.preventDefault();
+          dispatch(e.shiftKey ? { type: "CLEAR_BET" } : { type: "ALL_IN" });
         }
         return;
       }

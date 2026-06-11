@@ -1034,6 +1034,12 @@ h3,
   cursor: not-allowed;
 }
 
+/* No lingering focus ring on the chip buttons or table stacks after a click. */
+.chip:focus,
+.chipstack:focus {
+  outline: none;
+}
+
 .bet__actions {
   display: flex;
   align-items: center;

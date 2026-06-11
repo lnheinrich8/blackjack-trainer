@@ -1,16 +1,16 @@
 import { colorFor } from "../chips";
 
-const STACK_OFFSET = 9; // vertical px each chip in a pile peeks above the next
+const STACK_OFFSET = 6; // vertical px each chip in a pile peeks above the next
 
 // Draws the current bet as chip stacks on the felt — one pile per denomination,
-// highest value on the left. Clicking a stack removes one chip of that value
-// from the bet. `chips` is the raw list of placed chip values.
+// low to high left-to-right (matching the chip buttons). Clicking a stack removes
+// one chip of that value from the bet. `chips` is the raw list of placed values.
 function ChipStacks({ chips, onRemove }) {
   const counts = {};
   for (const value of chips) counts[value] = (counts[value] ?? 0) + 1;
   const values = Object.keys(counts)
     .map(Number)
-    .sort((a, b) => b - a);
+    .sort((a, b) => a - b);
 
   return (
     <div className="chipstacks">

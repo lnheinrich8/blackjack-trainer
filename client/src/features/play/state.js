@@ -17,10 +17,29 @@ import {
     canSplit,
     settle,
 } from "./engine";
+import { CHIP_DEFS } from "./chips";
 
 export const STARTING_BANKROLL = 1000;
 export const MAX_HANDS = 4; // a hand can be split up to three times
 const PENETRATION = 0.75; // reshuffle once this fraction of the shoe is spent
+
+// Chip denominations, largest first, for greedy bet decomposition (all-in).
+const DENOMS = [...CHIP_DEFS.map((c) => c.value)].sort((a, b) => b - a);
+const SMALLEST_CHIP = Math.min(...DENOMS);
+
+// Break an amount into a list of chip values, largest first (e.g. 1005 ->
+// [500, 500, 5]). The amount should already be a multiple of the smallest chip.
+function chipsFor(amount) {
+    const chips = [];
+    let remaining = amount;
+    for (const d of DENOMS) {
+        while (remaining >= d) {
+            chips.push(d);
+            remaining -= d;
+        }
+    }
+    return chips;
+}
 
 // --- state shape ---
 // {
@@ -186,6 +205,19 @@ export function reducer(state, action) {
             const betChips = state.betChips.filter((_, i) => i !== idx);
             return { ...state, bet: state.bet - action.value, betChips };
         }
+
+        // Bet the whole bankroll, rounded down to the nearest chip.
+        case "ALL_IN": {
+            if (state.phase !== "betting") return state;
+            const bet =
+                Math.floor(state.bankroll / SMALLEST_CHIP) * SMALLEST_CHIP;
+            return { ...state, bet, betChips: chipsFor(bet) };
+        }
+
+        // Take every chip off the table.
+        case "CLEAR_BET":
+            if (state.phase !== "betting") return state;
+            return { ...state, bet: 0, betChips: [] };
 
         case "REBUY":
             return { ...state, bankroll: state.bankroll + action.amount };
