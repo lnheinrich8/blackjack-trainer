@@ -373,6 +373,7 @@ h3,
 
 /* ---- blackjack table ---- */
 .table {
+  position: relative; /* positioning context for the dealing shoe */
   width: 100%;
   background: radial-gradient(
     ellipse at 50% 35%,
@@ -393,6 +394,62 @@ h3,
   min-height: 420px;
   box-shadow: inset 0 0 0 3px rgba(212, 175, 55, 0.3),
     inset 0 0 70px rgba(0, 0, 0, 0.5);
+}
+
+/* Dealing shoe in the top-right of the felt, tilted so its mouth points
+   down-left toward the table. The card stack shrinks as the shoe is dealt. */
+.shoe {
+  position: absolute;
+  top: 13%;
+  left: 72%; /* anchored by the mouth so the deck recedes toward it as it depletes */
+  height: 60px;
+  display: flex;
+  align-items: stretch;
+  transform: rotate(-20deg);
+  transform-origin: left center;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.5));
+}
+
+/* The shoe's mouth/holder (where cards slide out), pointing toward the table. */
+.shoe__mouth {
+  width: 22px;
+  height: 100%;
+  background: linear-gradient(160deg, #4a2c15, #251609);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+  border-radius: 6px 3px 3px 6px;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.6);
+}
+
+/* The static tray/body — always full length so the shoe looks able to hold the
+   whole deck even when empty. The cards sit inside it. */
+.shoe__bay {
+  position: relative;
+  width: 118px; /* matches MAX_WIDTH in Shoe.jsx */
+  height: 100%;
+  background: linear-gradient(160deg, #3a2410, #20130a);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.55);
+}
+
+/* The remaining cards, viewed edge-on, resting in the tray; width tracks how
+   many are left and recedes toward the mouth, revealing the empty tray behind. */
+.shoe__cards {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  background: repeating-linear-gradient(
+    90deg,
+    #f7f1e3 0,
+    #f7f1e3 2px,
+    #c3b693 2px,
+    #c3b693 3px
+  );
+  border-radius: 0 2px 2px 0;
+  transition: width 0.3s ease;
 }
 
 .table__dealer {

@@ -6,42 +6,42 @@ const STACK_OFFSET = 6; // vertical px each chip in a pile peeks above the next
 // low to high left-to-right (matching the chip buttons). Clicking a stack removes
 // one chip of that value from the bet. `chips` is the raw list of placed values.
 function ChipStacks({ chips, onRemove }) {
-  const counts = {};
-  for (const value of chips) counts[value] = (counts[value] ?? 0) + 1;
-  const values = Object.keys(counts)
-    .map(Number)
-    .sort((a, b) => a - b);
+    const counts = {};
+    for (const value of chips) counts[value] = (counts[value] ?? 0) + 1;
+    const values = Object.keys(counts)
+        .map(Number)
+        .sort((a, b) => a - b);
 
-  return (
-    <div className="chipstacks">
-      {values.map((value) => {
-        const count = counts[value];
-        const height = 48 + (count - 1) * STACK_OFFSET;
-        return (
-          <button
-            type="button"
-            className="chipstack"
-            key={value}
-            onClick={() => onRemove(value)}
-            title={`Remove one $${value} chip`}
-          >
-            <div className="chipstack__pile" style={{ height }}>
-              {Array.from({ length: count }, (_, i) => (
-                <span
-                  key={i}
-                  className={`chip chip--token chip--${colorFor(value)}`}
-                  style={{ bottom: i * STACK_OFFSET }}
-                >
-                  ${value}
-                </span>
-              ))}
-            </div>
-            <span className="chipstack__count">×{count}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
+    return (
+        <div className="chipstacks">
+            {values.map((value) => {
+                const count = counts[value];
+                const height = 48 + (count - 1) * STACK_OFFSET;
+                return (
+                    <button
+                        type="button"
+                        className="chipstack"
+                        key={value}
+                        onClick={() => onRemove(value)}
+                        title={`Remove one $${value} chip`}
+                    >
+                        <div className="chipstack__pile" style={{ height }}>
+                            {Array.from({ length: count }, (_, i) => (
+                                <span
+                                    key={i}
+                                    className={`chip chip--token chip--${colorFor(value)}`}
+                                    style={{ bottom: i * STACK_OFFSET }}
+                                >
+                                    ${value}
+                                </span>
+                            ))}
+                        </div>
+                        <span className="chipstack__count">×{count}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
 }
 
 export default ChipStacks;

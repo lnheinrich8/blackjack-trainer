@@ -4,15 +4,15 @@ import GuessInput from "../../shared/components/GuessInput";
 // Shown under the table when the drill pauses to ask for the running count.
 // Holds its own input value and hands the submitted string up to TableDrill.
 function CountPrompt({ onSubmit, busy }) {
-  const [value, setValue] = useState("");
+    const [value, setValue] = useState("");
 
-  const submit = () => {
-    if (value !== "") onSubmit(value);
-  };
+    const submit = () => {
+        if (value !== "") onSubmit(value);
+    };
 
-  return (
-    <GuessInput value={value} onChange={setValue} onSubmit={submit} busy={busy} />
-  );
+    return (
+        <GuessInput value={value} onChange={setValue} onSubmit={submit} busy={busy} />
+    );
 }
 
 export default CountPrompt;

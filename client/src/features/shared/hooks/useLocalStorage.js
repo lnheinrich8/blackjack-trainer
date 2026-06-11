@@ -6,11 +6,11 @@ import { readJson, writeJson } from "../utils/storage";
 // every change is written back. Returns the same [value, setValue] shape as
 // useState, so callers can pass either a value or an updater function.
 export function useLocalStorage(key, initialValue) {
-  const [value, setValue] = useState(() => readJson(key, initialValue));
+    const [value, setValue] = useState(() => readJson(key, initialValue));
 
-  useEffect(() => {
-    writeJson(key, value);
-  }, [key, value]);
+    useEffect(() => {
+        writeJson(key, value);
+    }, [key, value]);
 
-  return [value, setValue];
+    return [value, setValue];
 }
