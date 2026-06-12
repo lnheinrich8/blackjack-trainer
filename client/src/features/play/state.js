@@ -270,7 +270,11 @@ export function reducer(state, action) {
             if (state.phase !== "betting") return state;
             const bet = state.bet + action.value;
             if (bet > state.bankroll) return state; // can't stake more than you have
-            return { ...state, bet, betChips: [...state.betChips, action.value] };
+            // Rebuild the chips from the new total so they auto-consolidate into the
+            // fewest chips (e.g. five $5 -> one $25, two $500 -> one $1000). The
+            // denominations are each a multiple of the previous, so the greedy
+            // chipsFor() decomposition is the canonical, fully-merged set.
+            return { ...state, bet, betChips: chipsFor(bet) };
         }
 
         // Clicking a stack on the table removes one chip of that value.

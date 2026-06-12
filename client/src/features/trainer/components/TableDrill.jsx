@@ -3,7 +3,7 @@ import { startDrill, gradeGuess } from "../../../api/client";
 import BlackjackTable from "../../shared/components/BlackjackTable";
 import { writeShoe } from "../../shared/utils/shoeCache";
 import CountPrompt from "./CountPrompt";
-import FeedbackBanner from "./FeedbackBanner";
+import FeedbackLine from "./FeedbackLine";
 
 // Reshuffle once this fraction of the shoe has been dealt (cut-card penetration).
 const PENETRATION = 0.75;
@@ -220,6 +220,21 @@ function TableDrill({ controller, onConfigChange, onResult }) {
         };
     }, [state.phase, state.config]);
 
+    // After grading, Spacebar continues to the next hand (replacing the old
+    // Continue button). Trainer's global handler ignores Spacebar while running,
+    // so there's no conflict.
+    useEffect(() => {
+        if (state.phase !== "feedback") return;
+        const onKey = (e) => {
+            if (e.key === " ") {
+                e.preventDefault();
+                dispatch({ type: "CONTINUE" });
+            }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [state.phase]);
+
     // Grade the guess against the cards seen so far this shoe (server recomputes).
     const handleGuess = async (guessStr) => {
         const parsed = Number.parseInt(guessStr, 10);
@@ -292,12 +307,7 @@ function TableDrill({ controller, onConfigChange, onResult }) {
                 )}
 
                 {state.phase === "feedback" && state.result && (
-                    <FeedbackBanner
-                        result={state.result}
-                        decks={state.config.decks}
-                        note={state.feedback}
-                        onContinue={() => dispatch({ type: "CONTINUE" })}
-                    />
+                    <FeedbackLine result={state.result} />
                 )}
 
                 <p className="belt__keys">

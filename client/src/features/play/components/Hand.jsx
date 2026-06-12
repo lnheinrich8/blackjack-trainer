@@ -12,12 +12,14 @@ function Hand({
     bet,
     isActive = false,
     isUser = false,
+    collapsed = false,
     outcome = null,
     holeIndex = null,
 }) {
     const classes = ["hand"];
     if (isActive) classes.push("hand--active");
     if (isUser) classes.push("hand--user");
+    if (collapsed) classes.push("hand--collapsed");
     if (outcome) classes.push(`hand--${outcome}`);
 
     return (

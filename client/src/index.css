@@ -269,7 +269,11 @@ h3,
 .guess__row {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.6rem;
+  /* Fixed height shared by the count-asking row and the result line, so swapping
+     one for the other doesn't shift anything below. Matches the input's height. */
+  min-height: 2.2rem;
 }
 
 .guess__label {
@@ -279,6 +283,7 @@ h3,
 
 .guess input {
   width: 80px;
+  height: 2.2rem;
   text-align: center;
   font-size: 1.1rem;
   padding: 0.35rem 0.4rem;
@@ -293,6 +298,17 @@ h3,
   font-size: 0.85rem;
   color: var(--muted);
   opacity: 0.8;
+}
+
+/* The right/wrong verdict word in the post-guess feedback line. */
+.guess__verdict--win {
+  color: var(--win);
+  font-weight: 700;
+}
+
+.guess__verdict--lose {
+  color: var(--lose);
+  font-weight: 700;
 }
 
 .guess__hint strong {
@@ -738,16 +754,7 @@ h3,
   color: var(--accent);
 }
 
-.feedback {
-  width: 100%;
-  max-width: 420px;
-  text-align: center;
-}
-
-.feedback h2 {
-  margin: 0 0 0.75rem;
-}
-
+/* Tone colors for the settled-round heading (Play's RoundResult). */
 .feedback--win h2 {
   color: var(--win);
 }
@@ -755,18 +762,9 @@ h3,
 .feedback--lose h2 {
   color: var(--lose);
 }
+
 .feedback--push h2 {
   color: var(--muted);
-}
-
-.feedback__line {
-  margin: 0.25rem 0;
-}
-
-.feedback__note {
-  color: var(--accent);
-  font-weight: 600;
-  margin: 0.6rem 0 1rem;
 }
 
 /* ---- trainer: page controls + config modal ---- */
@@ -893,6 +891,30 @@ h3,
   border-radius: 999px;
 }
 
+/* The "Testing custom" badge is clickable (drops back to plain Custom). */
+.badge--clickable {
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.badge-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* "Cancel testing mode" hint, revealed to the right when hovering the badge. */
+.badge__hint {
+  display: none;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.badge--clickable:hover + .badge__hint {
+  display: inline;
+}
+
 .difficulty-row {
   display: flex;
   flex-wrap: wrap;
@@ -992,9 +1014,19 @@ h3,
   gap: 0;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
   margin-left: -14px;
+  transition: margin-left 0.2s ease;
 }
 
 .hand__cards .card:first-child {
+  margin-left: 0;
+}
+
+/* A bot's hand collapses to a tight stack when it's not that seat's turn. */
+.hand--collapsed .hand__cards .card {
+  margin-left: -40px;
+}
+
+.hand--collapsed .hand__cards .card:first-child {
   margin-left: 0;
 }
 
@@ -1042,6 +1074,13 @@ h3,
   box-shadow: 0 0 0 2px var(--accent), 0 0 14px rgba(212, 175, 55, 0.4);
 }
 
+/* Bots get a dotted ring instead of the user's solid one (outline keeps it from
+   shifting the cards the way a border would). */
+.hand--active:not(.hand--user) {
+  box-shadow: 0 0 14px rgba(212, 175, 55, 0.4);
+  outline: 2px dotted var(--accent);
+}
+
 .hand--win,
 .hand--blackjack {
   box-shadow: 0 0 0 2px var(--win);
@@ -1053,6 +1092,23 @@ h3,
 
 .hand--push {
   box-shadow: 0 0 0 2px var(--muted);
+}
+
+/* Bots get dotted outcome rings (the user keeps the solid ones). */
+.hand--win:not(.hand--user),
+.hand--blackjack:not(.hand--user) {
+  box-shadow: none;
+  outline: 2px dotted var(--win);
+}
+
+.hand--lose:not(.hand--user) {
+  box-shadow: none;
+  outline: 2px dotted var(--lose);
+}
+
+.hand--push:not(.hand--user) {
+  box-shadow: none;
+  outline: 2px dotted var(--muted);
 }
 
 /* Betting */
@@ -1115,6 +1171,11 @@ h3,
 .chip--purple {
   background: #5b2a83;
   border-color: #c79be8;
+}
+.chip--blue {
+  background: #1f54b3;
+  border-color: #ffffff;
+  border-style: dotted; /* white dotted ridge for the $1000 chip */
 }
 
 .bet__chips .chip {

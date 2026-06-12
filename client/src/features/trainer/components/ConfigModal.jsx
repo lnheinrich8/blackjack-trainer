@@ -139,12 +139,16 @@ function ConfigModal({
                         </label>
 
                         <label className="field">
-                            <span>Players</span>
+                            <span>Other players</span>
+                            {/* The value is the number of other players (excluding the
+                                user); we store total seats internally, so map ±1. */}
                             <select
-                                value={config.numPlayers}
-                                onChange={(e) => set({ numPlayers: Number(e.target.value) })}
+                                value={config.numPlayers - 1}
+                                onChange={(e) =>
+                                    set({ numPlayers: Number(e.target.value) + 1 })
+                                }
                             >
-                                {[1, 2, 3, 4, 5, 6].map((n) => (
+                                {[0, 1, 2, 3, 4, 5].map((n) => (
                                     <option key={n} value={n}>
                                         {n}
                                     </option>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useReducer, useState } from "react";
 import { getShoe } from "../../api/client";
 import { useLocalStorage } from "../shared/hooks/useLocalStorage";
 import { readShoe, writeShoe, clearShoe } from "../shared/utils/shoeCache";
@@ -15,7 +15,13 @@ import {
 } from "./state";
 import { decide, PLAYER_TYPES } from "./strategy";
 import { canSplit } from "./engine";
-import { PRESETS, DEFAULT_DIFFICULTY, labelFor, statusDetails } from "./playModes";
+import {
+    PRESETS,
+    DEFAULT_DIFFICULTY,
+    labelFor,
+    statusDetails,
+    isTestingMode,
+} from "./playModes";
 import PlayTable from "./components/PlayTable";
 import BetControls from "./components/BetControls";
 import RoundResult from "./components/RoundResult";
@@ -25,9 +31,10 @@ import { CHIP_DEFS } from "./chips";
 
 // Number-row / numpad hotkeys → chip value (1=$5, 2=$25, 3=$100, 4=$500). Keyed
 // by e.code so it's layout-independent and unaffected by Shift (which we read
-// separately to remove a chip instead of add).
+// separately to remove a chip instead of add). Only the first four chips get a
+// key — 5 is reserved for all-in, so the $1000 chip is click-only.
 const CHIP_KEYS = {};
-CHIP_DEFS.forEach((chip, i) => {
+CHIP_DEFS.slice(0, 4).forEach((chip, i) => {
     CHIP_KEYS[`Digit${i + 1}`] = chip.value;
     CHIP_KEYS[`Numpad${i + 1}`] = chip.value;
 });
@@ -44,7 +51,7 @@ const NPC_BETS = [25, 50, 75, 100, 150, 200];
 // Dynamic-seating tuning: bots a dynamic table starts with, the cap, and how
 // often (per round) the table changes — when it does, one bot joins or leaves.
 const DYNAMIC_START_BOTS = 3; // a 4-seat table to begin
-const MAX_BOTS = 5; // 6 seats including the user
+const MAX_BOTS = 4; // 5 seats including the user (2 left + 2 right)
 const DYNAMIC_CHANGE_PROB = 0.5; // ~every other hand a player comes or goes
 
 // The starting difficulty/config, used until the player picks something else.
@@ -54,6 +61,22 @@ const DEFAULT_SAVED = {
 };
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Hi-Lo card values for the Testing-mode running count (2-6:+1, 7-9:0, 10-A:-1).
+const HILO = {
+    TWO: 1, THREE: 1, FOUR: 1, FIVE: 1, SIX: 1,
+    SEVEN: 0, EIGHT: 0, NINE: 0,
+    TEN: -1, JACK: -1, QUEEN: -1, KING: -1, ACE: -1,
+};
+
+// The running count of every face-up card seen so far this shoe — i.e. all dealt
+// cards minus the dealer's hole card while it's still hidden.
+function runningCount(shoe, pos, dealer, holeHidden) {
+    let count = 0;
+    for (let i = 0; i < pos; i++) count += HILO[shoe[i].rank];
+    if (holeHidden && dealer.length >= 2) count -= HILO[dealer[1].rank];
+    return count;
+}
 
 // Build the round's seats from an ordered list of bot personalities: the user
 // sits dead-center (see seatLayout) with the bots fanned out left and right.
@@ -194,8 +217,8 @@ function Play() {
     const [modalOpen, setModalOpen] = useState(false);
 
     // The persistent bot roster for Dynamic mode (null until the first dynamic
-    // deal seeds it). Lives in a ref so evolving it doesn't trigger re-renders.
-    const rosterRef = useRef(null);
+    // deal seeds it). In state so the betting-phase seat preview reflects it.
+    const [roster, setRoster] = useState(null);
 
     // Whether a candidate config actually changes the game from the current one
     // (Dynamic always differs; otherwise compare the concrete values).
@@ -214,16 +237,28 @@ function Play() {
         setSavedConfig(next);
         if (configDiffers(next)) {
             clearShoe();
-            rosterRef.current = null; // re-seed dynamic seating under the new config
+            setRoster(null); // re-seed dynamic seating under the new config
             dispatch({ type: "CONFIGURE" });
         }
     };
 
-    // Picking a preset fills in its values; editing a value flips to Custom.
+    // Picking a preset fills in its values; editing a value flips to Custom —
+    // except while in a Testing mode, which flips to "testing-custom" so the
+    // running count keeps showing.
     const selectDifficulty = (id) =>
         applyConfig({ difficultyId: id, config: PRESETS[id] });
     const changeConfig = (config) =>
-        applyConfig({ difficultyId: "custom", config });
+        applyConfig({
+            difficultyId: isTestingMode(savedConfig.difficultyId)
+                ? "testing-custom"
+                : "custom",
+            config,
+        });
+
+    // Clicking the "Testing custom" badge drops to a plain Custom (same values,
+    // just no running count) without resetting the shoe.
+    const exitTesting = () =>
+        applyConfig({ difficultyId: "custom", config: savedConfig.config });
 
     // Build the seats and start the deal (used for the first hand and after each).
     // Static difficulties use a fixed bot count; Dynamic keeps a persistent bot
@@ -233,13 +268,12 @@ function Play() {
     const startDeal = useCallback(() => {
         let botTypes;
         if (savedConfig.difficultyId === "dynamic") {
-            const prev = rosterRef.current;
-            if (prev === null) {
+            if (roster === null) {
                 botTypes = Array.from({ length: DYNAMIC_START_BOTS }, () =>
                     pick(PLAYER_TYPES),
                 );
             } else {
-                botTypes = [...prev];
+                botTypes = [...roster];
                 if (Math.random() < DYNAMIC_CHANGE_PROB) {
                     const leaving = Math.random() < 0.5;
                     if (leaving && botTypes.length > 0) {
@@ -249,14 +283,14 @@ function Play() {
                     }
                 }
             }
-            rosterRef.current = botTypes;
+            setRoster(botTypes);
         } else {
             const count = Math.max(0, savedConfig.config.numPlayers - 1);
             botTypes = Array.from({ length: count }, () => pick(PLAYER_TYPES));
         }
         const { players, userIndex } = buildSeats(botTypes, state.bet);
         dispatch({ type: "DEAL", players, userIndex });
-    }, [savedConfig.difficultyId, savedConfig.config.numPlayers, state.bet]);
+    }, [savedConfig.difficultyId, savedConfig.config.numPlayers, state.bet, roster]);
 
     // Keyboard controls. Spacebar deals / advances; during betting 1-4 add a chip
     // (Shift+1-4 removes one); during the player's turn Z=hit, X=stand, C=double,
@@ -359,6 +393,37 @@ function Play() {
         return () => clearTimeout(id);
     }, [blocker]);
 
+    // How many bot seats to preview during betting. Static difficulties use the
+    // configured count; Dynamic uses its current roster (the seats from the last
+    // hand, or the seed before the first deal). Driven by config, so it only
+    // changes when settings change — not on reshuffle or between hands.
+    const previewBots =
+        savedConfig.difficultyId === "dynamic"
+            ? roster?.length ?? DYNAMIC_START_BOTS
+            : Math.max(0, savedConfig.config.numPlayers - 1);
+
+    // The bankroll-hover detail lines. Testing mode also reveals the live running
+    // count (handy for checking your own count) — no other mode shows it.
+    const statusLines = [
+        labelFor(savedConfig.difficultyId),
+        ...statusDetails(savedConfig.difficultyId, savedConfig.config),
+    ];
+    if (isTestingMode(savedConfig.difficultyId)) {
+        const rc = runningCount(
+            state.shoe,
+            state.pos,
+            state.dealer,
+            state.dealerHoleHidden,
+        );
+        // True count = running count per deck (to 2 decimals), matching the app's
+        // RC / total-decks convention.
+        const decks = savedConfig.config.decks;
+        const tc = decks > 0 ? rc / decks : 0;
+        const rcStr = `${rc > 0 ? "+" : ""}${rc}`;
+        const tcStr = `${tc > 0 ? "+" : ""}${tc.toFixed(2)}`;
+        statusLines.push(`RC: ${rcStr}, TC: ${tcStr}`);
+    }
+
     return (
         <section className="play">
             <div className="trainer__bar">
@@ -378,10 +443,7 @@ function Play() {
                             Bankroll <strong>${state.bankroll}</strong>
                         </>
                     }
-                    details={[
-                        labelFor(savedConfig.difficultyId),
-                        ...statusDetails(savedConfig.difficultyId, savedConfig.config),
-                    ]}
+                    details={statusLines}
                 />
             </div>
 
@@ -396,6 +458,7 @@ function Play() {
                         userIndex={state.userIndex}
                         active={state.active}
                         phase={state.phase}
+                        previewBots={previewBots}
                         betChips={state.betChips}
                         onRemoveChip={(value) => dispatch({ type: "REMOVE_CHIP", value })}
                         cardsRemaining={state.shoe.length - state.pos}
@@ -464,6 +527,7 @@ function Play() {
                     config={savedConfig.config}
                     onSelectDifficulty={selectDifficulty}
                     onChangeConfig={changeConfig}
+                    onExitTesting={exitTesting}
                     onClose={() => setModalOpen(false)}
                 />
             )}

@@ -6,15 +6,17 @@
 
 // Fixed difficulty presets shown in the Play config modal.
 export const PRESETS = {
+    testing: { decks: 1, numPlayers: 1 }, // same as easy; reveals the running count
     easy: { decks: 1, numPlayers: 1 }, // heads-up: just you
     normal: { decks: 4, numPlayers: 3 }, // you plus a couple of others
-    hard: { decks: 8, numPlayers: 6 }, // max decks, a full table
+    hard: { decks: 8, numPlayers: 5 }, // max decks, a full table
     dynamic: { decks: 8, numPlayers: 4 }, // max decks; seat count drifts as you play
 };
 
 // Order shown in the modal. "Custom" is derived (selected automatically when the
 // user edits a specific value), so it isn't in this pickable list.
 export const DIFFICULTIES = [
+    { id: "testing", label: "Testing" },
     { id: "easy", label: "Easy" },
     { id: "normal", label: "Normal" },
     { id: "hard", label: "Hard" },
@@ -23,7 +25,14 @@ export const DIFFICULTIES = [
 
 export const DEFAULT_DIFFICULTY = "easy";
 
+// "Testing" and its edited variant "testing-custom" both reveal the running
+// count in the bankroll hover stats.
+export function isTestingMode(difficultyId) {
+    return difficultyId === "testing" || difficultyId === "testing-custom";
+}
+
 export function labelFor(difficultyId) {
+    if (difficultyId === "testing-custom") return "Testing custom";
     const found = DIFFICULTIES.find((d) => d.id === difficultyId);
     return found ? found.label : "Custom";
 }

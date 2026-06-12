@@ -10,6 +10,7 @@ function PlayConfigModal({
     config,
     onSelectDifficulty,
     onChangeConfig,
+    onExitTesting,
     onClose,
 }) {
     const isDynamic = difficultyId === "dynamic";
@@ -28,6 +29,18 @@ function PlayConfigModal({
                 <p className="modal__label">
                     Difficulty
                     {difficultyId === "custom" && <span className="badge">Custom</span>}
+                    {difficultyId === "testing-custom" && (
+                        <span className="badge-wrap">
+                            <button
+                                type="button"
+                                className="badge badge--clickable"
+                                onClick={onExitTesting}
+                            >
+                                Testing custom
+                            </button>
+                            <span className="badge__hint">Cancel testing mode</span>
+                        </span>
+                    )}
                 </p>
                 <div className="difficulty-row">
                     {DIFFICULTIES.map((d) => (
@@ -63,12 +76,16 @@ function PlayConfigModal({
                         </label>
 
                         <label className="field">
-                            <span>Players</span>
+                            <span>Other players</span>
+                            {/* The value is the number of bots (excluding the user); we
+                                store total seats internally, so map ±1 on read/write. */}
                             <select
-                                value={config.numPlayers}
-                                onChange={(e) => set({ numPlayers: Number(e.target.value) })}
+                                value={config.numPlayers - 1}
+                                onChange={(e) =>
+                                    set({ numPlayers: Number(e.target.value) + 1 })
+                                }
                             >
-                                {[1, 2, 3, 4, 5, 6].map((n) => (
+                                {[0, 1, 2, 3, 4].map((n) => (
                                     <option key={n} value={n}>
                                         {n}
                                     </option>

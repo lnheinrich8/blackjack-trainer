@@ -2,6 +2,7 @@ import Hand from "./Hand";
 import ChipStacks from "./ChipStacks";
 import Shoe from "../../shared/components/Shoe";
 import { handValue, isBlackjack } from "../engine";
+import { seatLayout } from "../state";
 
 // Format a hand's value for display: "BJ" for a natural, "7/17" for a soft total
 // (ace as 1 or 11), otherwise the plain total. Empty hands show nothing.
@@ -13,26 +14,40 @@ function totalLabel(cards) {
 }
 
 // One seat's hand(s). A seat with no splits shows a single hand; the user's
-// hands are labelled ("You", or "Hand 1/2/…" once split), the bots' aren't.
+// hands are labelled ("You", or "Hand 1/2/…" once split), the bots' are tagged
+// "Player". A bot's cards collapse into a tight overlap except while it's being
+// dealt to (dealing phase) or while it's the active seat on its turn — so the
+// table stays tidy and the eye follows whoever is acting. The user never collapses.
 function Seat({ seat, seatIndex, active, phase }) {
     const isUser = seat.kind === "user";
     const split = seat.hands.length > 1;
+    const isSeatActive = phase === "playerTurn" && active.p === seatIndex;
+    const collapsed = !isUser && phase !== "dealing" && !isSeatActive;
     return (
         <div className="playseat">
             {seat.hands.map((hand, h) => (
                 <Hand
                     key={h}
-                    label={isUser ? (split ? `Hand ${h + 1}` : "You") : null}
+                    label={isUser ? (split ? `Hand ${h + 1}` : "You") : "Player"}
                     cards={hand.cards}
                     totalText={totalLabel(hand.cards)}
                     bet={hand.bet}
                     isUser={isUser}
-                    isActive={
-                        phase === "playerTurn" && active.p === seatIndex && active.h === h
-                    }
+                    isActive={isSeatActive && active.h === h}
+                    collapsed={collapsed}
                     outcome={hand.outcome}
                 />
             ))}
+        </div>
+    );
+}
+
+// An empty bot seat for the betting phase — a dotted square plus a "Player" tag,
+// so the other players are visible on the table before any cards are dealt.
+function EmptySeat() {
+    return (
+        <div className="playseat">
+            <Hand label="Player" cards={[]} />
         </div>
     );
 }
@@ -48,6 +63,7 @@ function PlayTable({
     userIndex,
     active,
     phase,
+    previewBots = 0,
     betChips = [],
     onRemoveChip,
     cardsRemaining = 0,
@@ -63,17 +79,21 @@ function PlayTable({
 
     const betting = phase === "betting";
 
-    // During betting the wings are empty and only the user's bet spot shows; the
-    // bots appear once the deal begins (their wings populate without moving You).
+    // During betting we show the configured bots as empty seats flanking the
+    // user's bet spot (same left/right split they'll be dealt into). Otherwise the
+    // live seats render with their cards.
     const seatProps = { active, phase };
-    const leftSeats = betting
-        ? null
-        : players
+    let leftSeats;
+    let rightSeats;
+    if (betting) {
+        const { left, right } = seatLayout(previewBots + 1);
+        leftSeats = Array.from({ length: left }, (_, i) => <EmptySeat key={`l${i}`} />);
+        rightSeats = Array.from({ length: right }, (_, i) => <EmptySeat key={`r${i}`} />);
+    } else {
+        leftSeats = players
             .slice(0, userIndex)
             .map((seat, i) => <Seat key={seat.id} seat={seat} seatIndex={i} {...seatProps} />);
-    const rightSeats = betting
-        ? null
-        : players
+        rightSeats = players
             .slice(userIndex + 1)
             .map((seat, i) => (
                 <Seat
@@ -83,6 +103,7 @@ function PlayTable({
                     {...seatProps}
                 />
             ));
+    }
 
     return (
         <div className="table">
