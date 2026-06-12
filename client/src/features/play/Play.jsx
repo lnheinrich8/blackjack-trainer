@@ -1,19 +1,26 @@
-import { useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { getShoe } from "../../api/client";
 import { useLocalStorage } from "../shared/hooks/useLocalStorage";
-import { readShoe, writeShoe } from "../shared/utils/shoeCache";
+import { readShoe, writeShoe, clearShoe } from "../shared/utils/shoeCache";
 import {
     reducer,
     init,
     doubleReason,
     splitReason,
     needsReshuffle,
+    isUserTurn,
+    seatLayout,
+    MAX_HANDS,
     STARTING_BANKROLL,
 } from "./state";
+import { decide, PLAYER_TYPES } from "./strategy";
+import { canSplit } from "./engine";
+import { PRESETS, DEFAULT_DIFFICULTY, labelFor, statusDetails } from "./playModes";
 import PlayTable from "./components/PlayTable";
 import BetControls from "./components/BetControls";
 import RoundResult from "./components/RoundResult";
 import PlayConfigModal from "./components/PlayConfigModal";
+import DrillStatus from "../shared/components/DrillStatus";
 import { CHIP_DEFS } from "./chips";
 
 // Number-row / numpad hotkeys → chip value (1=$5, 2=$25, 3=$100, 4=$500). Keyed
@@ -25,11 +32,49 @@ CHIP_DEFS.forEach((chip, i) => {
     CHIP_KEYS[`Numpad${i + 1}`] = chip.value;
 });
 
-const DECKS = 6; // shoe size for the Play game
 const DEAL_MS = 450; // pause between cards of the opening deal
 const DEALER_MS = 700; // pause between the dealer's draws
+const NPC_MS = 600; // pause between a bot's decisions
 const REBUY = 1000; // chips handed out when you bust your bankroll
 const MIN_CHIP = 5; // smallest chip; below this with no bet you must re-buy
+
+// Flat bets the bots place — purely cosmetic (they don't touch your bankroll).
+const NPC_BETS = [25, 50, 75, 100, 150, 200];
+
+// Dynamic-seating tuning: bots a dynamic table starts with, the cap, and how
+// often (per round) the table changes — when it does, one bot joins or leaves.
+const DYNAMIC_START_BOTS = 3; // a 4-seat table to begin
+const MAX_BOTS = 5; // 6 seats including the user
+const DYNAMIC_CHANGE_PROB = 0.5; // ~every other hand a player comes or goes
+
+// The starting difficulty/config, used until the player picks something else.
+const DEFAULT_SAVED = {
+    difficultyId: DEFAULT_DIFFICULTY,
+    config: PRESETS[DEFAULT_DIFFICULTY],
+};
+
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+// Build the round's seats from an ordered list of bot personalities: the user
+// sits dead-center (see seatLayout) with the bots fanned out left and right.
+// Each bot re-rolls a flat cosmetic bet. Returns { players, userIndex } for DEAL.
+function buildSeats(botTypes, userBet) {
+    const { left, userIndex } = seatLayout(botTypes.length + 1);
+    const specs = botTypes.map((type) => ({
+        kind: "npc",
+        type,
+        bet: pick(NPC_BETS),
+    }));
+    specs.splice(left, 0, { kind: "user", type: null, bet: userBet });
+
+    const players = specs.map((s, i) => ({
+        id: `seat-${i}`,
+        kind: s.kind,
+        type: s.type,
+        hands: [{ cards: [], bet: s.bet, status: "playing", outcome: null }],
+    }));
+    return { players, userIndex };
+}
 
 // The Play page: real blackjack against the dealer, dealt from a server-provided
 // predetermined shoe. The reducer (state.js) holds the game; this component owns
@@ -40,6 +85,11 @@ function Play() {
         "bjack.play.bankroll",
         STARTING_BANKROLL,
     );
+    const [savedConfig, setSavedConfig] = useLocalStorage(
+        "bjack.play.config",
+        DEFAULT_SAVED,
+    );
+    const decks = savedConfig.config.decks;
     const [state, dispatch] = useReducer(reducer, savedBankroll, (bankroll) => {
         // Resume the in-progress shoe if it's still ours. Starting a Train drill
         // claims the shared cache as "train", which makes this restore a no-op.
@@ -75,7 +125,7 @@ function Play() {
         if (!needsReshuffle(state)) return;
         let cancelled = false;
         (async () => {
-            const data = await getShoe(DECKS);
+            const data = await getShoe(decks);
             if (!cancelled) dispatch({ type: "RESHUFFLE", shoe: data.sequence });
         })();
         return () => {
@@ -98,6 +148,37 @@ function Play() {
         return () => clearTimeout(id);
     }, [state.phase, state.dealer.length]);
 
+    // Auto-play the bots: when the active seat is a bot, wait a beat then dispatch
+    // its decision. Personality + dealer up-card drive decide(); an illegal
+    // "double"/"split" falls back to a hit so play always progresses. state.pos is
+    // in the deps so a bot that hits and keeps going re-triggers the next step.
+    useEffect(() => {
+        if (state.phase !== "playerTurn") return;
+        if (state.active.p === state.userIndex) return; // user's turn — wait for keys
+        const seat = state.players[state.active.p];
+        const hand = seat.hands[state.active.h];
+        if (!hand || hand.status !== "playing") return;
+        const id = setTimeout(() => {
+            let action = decide(hand.cards, state.dealer[0], seat.type, Math.random);
+            if (action === "double" && hand.cards.length !== 2) action = "hit";
+            if (
+                action === "split" &&
+                (!canSplit(hand.cards) || seat.hands.length >= MAX_HANDS)
+            ) {
+                action = "hit";
+            }
+            dispatch({ type: action.toUpperCase() });
+        }, NPC_MS);
+        return () => clearTimeout(id);
+    }, [
+        state.phase,
+        state.active,
+        state.pos,
+        state.players,
+        state.dealer,
+        state.userIndex,
+    ]);
+
     const shoeLoading = state.shoe.length === 0;
     const dealDisabled = shoeLoading || needsReshuffle(state);
     const broke = state.bankroll < MIN_CHIP && state.bet === 0;
@@ -111,6 +192,71 @@ function Play() {
     const [blocker, setBlocker] = useState(null);
 
     const [modalOpen, setModalOpen] = useState(false);
+
+    // The persistent bot roster for Dynamic mode (null until the first dynamic
+    // deal seeds it). Lives in a ref so evolving it doesn't trigger re-renders.
+    const rosterRef = useRef(null);
+
+    // Whether a candidate config actually changes the game from the current one
+    // (Dynamic always differs; otherwise compare the concrete values).
+    const configDiffers = (next) => {
+        const nextDyn = next.difficultyId === "dynamic";
+        const curDyn = savedConfig.difficultyId === "dynamic";
+        if (nextDyn !== curDyn) return true;
+        const a = next.config;
+        const b = savedConfig.config;
+        return a.decks !== b.decks || a.numPlayers !== b.numPlayers;
+    };
+
+    // Persist the new settings; if they actually differ, drop the current shoe and
+    // start a fresh betting round so the next hand uses the new deck/seat config.
+    const applyConfig = (next) => {
+        setSavedConfig(next);
+        if (configDiffers(next)) {
+            clearShoe();
+            rosterRef.current = null; // re-seed dynamic seating under the new config
+            dispatch({ type: "CONFIGURE" });
+        }
+    };
+
+    // Picking a preset fills in its values; editing a value flips to Custom.
+    const selectDifficulty = (id) =>
+        applyConfig({ difficultyId: id, config: PRESETS[id] });
+    const changeConfig = (config) =>
+        applyConfig({ difficultyId: "custom", config });
+
+    // Build the seats and start the deal (used for the first hand and after each).
+    // Static difficulties use a fixed bot count; Dynamic keeps a persistent bot
+    // roster that drifts between hands (bots join/leave) — the user is always
+    // seated. The roster is null until the first dynamic deal and is reset on a
+    // config change (see applyConfig).
+    const startDeal = useCallback(() => {
+        let botTypes;
+        if (savedConfig.difficultyId === "dynamic") {
+            const prev = rosterRef.current;
+            if (prev === null) {
+                botTypes = Array.from({ length: DYNAMIC_START_BOTS }, () =>
+                    pick(PLAYER_TYPES),
+                );
+            } else {
+                botTypes = [...prev];
+                if (Math.random() < DYNAMIC_CHANGE_PROB) {
+                    const leaving = Math.random() < 0.5;
+                    if (leaving && botTypes.length > 0) {
+                        botTypes.splice(Math.floor(Math.random() * botTypes.length), 1);
+                    } else if (botTypes.length < MAX_BOTS) {
+                        botTypes.push(pick(PLAYER_TYPES));
+                    }
+                }
+            }
+            rosterRef.current = botTypes;
+        } else {
+            const count = Math.max(0, savedConfig.config.numPlayers - 1);
+            botTypes = Array.from({ length: count }, () => pick(PLAYER_TYPES));
+        }
+        const { players, userIndex } = buildSeats(botTypes, state.bet);
+        dispatch({ type: "DEAL", players, userIndex });
+    }, [savedConfig.difficultyId, savedConfig.config.numPlayers, state.bet]);
 
     // Keyboard controls. Spacebar deals / advances; during betting 1-4 add a chip
     // (Shift+1-4 removes one); during the player's turn Z=hit, X=stand, C=double,
@@ -129,12 +275,12 @@ function Play() {
                     } else if (shoeLoading) {
                         // First hand: fetch the shoe, then deal once it's loaded.
                         (async () => {
-                            const data = await getShoe(DECKS);
+                            const data = await getShoe(decks);
                             dispatch({ type: "RESHUFFLE", shoe: data.sequence });
-                            dispatch({ type: "DEAL" });
+                            startDeal();
                         })();
                     } else if (!dealDisabled) {
-                        dispatch({ type: "DEAL" });
+                        startDeal();
                     }
                 } else if (state.phase === "settle") {
                     e.preventDefault();
@@ -147,7 +293,7 @@ function Play() {
             if ((e.key === "r" || e.key === "R") && state.phase === "betting") {
                 e.preventDefault();
                 (async () => {
-                    const data = await getShoe(DECKS);
+                    const data = await getShoe(decks);
                     dispatch({ type: "RESHUFFLE", shoe: data.sequence });
                 })();
                 return;
@@ -171,7 +317,8 @@ function Play() {
                 return;
             }
 
-            if (state.phase !== "playerTurn") return;
+            // Action keys only while it's actually the user's turn (bots auto-play).
+            if (!isUserTurn(state)) return;
             const flash = (text) =>
                 setBlocker((prev) => ({ text, id: (prev?.id ?? 0) + 1 }));
             switch (e.key.toLowerCase()) {
@@ -203,7 +350,7 @@ function Play() {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [state, dealDisabled, shoeLoading, modalOpen]);
+    }, [state, dealDisabled, shoeLoading, modalOpen, decks, startDeal]);
 
     // Clear the blocker message 3 seconds after it (re)appears.
     useEffect(() => {
@@ -224,9 +371,18 @@ function Play() {
                         ⚙
                     </button>
                 </div>
-                <div className="play__bankroll">
-                    Bankroll <strong>${state.bankroll}</strong>
-                </div>
+                <DrillStatus
+                    toggleClassName="play__bankroll"
+                    label={
+                        <>
+                            Bankroll <strong>${state.bankroll}</strong>
+                        </>
+                    }
+                    details={[
+                        labelFor(savedConfig.difficultyId),
+                        ...statusDetails(savedConfig.difficultyId, savedConfig.config),
+                    ]}
+                />
             </div>
 
             <div className="trainer__spacer trainer__spacer--top" aria-hidden="true" />
@@ -236,7 +392,8 @@ function Play() {
                     <PlayTable
                         dealer={state.dealer}
                         dealerHoleHidden={state.dealerHoleHidden}
-                        hands={state.hands}
+                        players={state.players}
+                        userIndex={state.userIndex}
                         active={state.active}
                         phase={state.phase}
                         betChips={state.betChips}
@@ -271,19 +428,22 @@ function Play() {
                         <p className="belt__msg belt__msg--hint">Dealing…</p>
                     )}
 
-                    {state.phase === "playerTurn" && (
-                        <div className="actions-hint">
-                            <p className="belt__keys">
-                                <strong>Z</strong> Hit · <strong>X</strong> Stand ·{" "}
-                                <strong>C</strong> Double · <strong>V</strong> Split
-                            </p>
-                            {blocker && (
-                                <p key={blocker.id} className="actions-block">
-                                    {blocker.text}
+                    {state.phase === "playerTurn" &&
+                        (isUserTurn(state) ? (
+                            <div className="actions-hint">
+                                <p className="belt__keys">
+                                    <strong>Z</strong> Hit · <strong>X</strong> Stand ·{" "}
+                                    <strong>C</strong> Double · <strong>V</strong> Split
                                 </p>
-                            )}
-                        </div>
-                    )}
+                                {blocker && (
+                                    <p key={blocker.id} className="actions-block">
+                                        {blocker.text}
+                                    </p>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="belt__msg belt__msg--hint">Players acting…</p>
+                        ))}
 
                     {state.phase === "dealerTurn" && (
                         <p className="belt__msg belt__msg--hint">Dealer plays…</p>
@@ -298,7 +458,15 @@ function Play() {
                 aria-hidden="true"
             />
 
-            {modalOpen && <PlayConfigModal onClose={() => setModalOpen(false)} />}
+            {modalOpen && (
+                <PlayConfigModal
+                    difficultyId={savedConfig.difficultyId}
+                    config={savedConfig.config}
+                    onSelectDifficulty={selectDifficulty}
+                    onChangeConfig={changeConfig}
+                    onClose={() => setModalOpen(false)}
+                />
+            )}
         </section>
     );
 }

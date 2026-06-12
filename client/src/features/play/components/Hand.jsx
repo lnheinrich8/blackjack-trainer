@@ -37,7 +37,7 @@ function Hand({
             </div>
 
             <div className="hand__meta">
-                <span className="hand__flag">{label}</span>
+                {label != null && <span className="hand__flag">{label}</span>}
                 {totalText != null && <span className="hand__total">{totalText}</span>}
                 {bet != null && <span className="hand__bet">${bet}</span>}
             </div>

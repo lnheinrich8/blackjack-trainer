@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import BlackjackTable from "../shared/components/BlackjackTable";
 import TableDrill from "./components/TableDrill";
 import ConfigModal from "./components/ConfigModal";
-import DrillStatus from "./components/DrillStatus";
+import DrillStatus from "../shared/components/DrillStatus";
 import { useLocalStorage } from "../shared/hooks/useLocalStorage";
 import {
     PRESETS,

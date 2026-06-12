@@ -7,10 +7,11 @@ import { readJson, writeJson } from "./storage";
 // but starting a game on the other page overwrites the slot and discards it.
 const KEY = "bjack.shoe";
 
-// Return the cached shoe ({ sequence, pos }) if it belongs to `owner`, else null.
+// Return the cached shoe ({ sequence, pos }) if it belongs to `owner` and holds
+// cards, else null. (An empty/cleared slot restores nothing.)
 export function readShoe(owner) {
     const cached = readJson(KEY, null);
-    if (cached?.owner === owner && Array.isArray(cached.sequence)) {
+    if (cached?.owner === owner && Array.isArray(cached.sequence) && cached.sequence.length > 0) {
         return { sequence: cached.sequence, pos: cached.pos ?? 0 };
     }
     return null;
@@ -19,4 +20,10 @@ export function readShoe(owner) {
 // Claim the slot for `owner` and store the live shoe and position.
 export function writeShoe(owner, sequence, pos) {
     writeJson(KEY, { owner, sequence, pos });
+}
+
+// Drop the cached shoe so nothing is restored (e.g. settings changed, the old
+// shoe no longer matches the new deck count).
+export function clearShoe() {
+    writeJson(KEY, null);
 }

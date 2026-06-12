@@ -3,10 +3,14 @@
 //
 //   betting → dealing → playerTurn → dealerTurn → settle → (NEXT_ROUND) betting
 //
-// The component (Play.jsx) owns the timing: it dispatches DEAL_CARD / DEALER_CARD
-// on timers so the deal and the dealer's draws animate one card at a time. All
-// rules math lives in engine.js; this file only sequences the game and moves
-// chips. Cards are consumed in order from a predetermined shoe (fetched whole).
+// The table is multi-seat: the human ("user") plus zero or more bot seats
+// ("npc"). All seats are dealt and played; the bots' decisions are computed in
+// the component (Play.jsx) and dispatched as the same HIT/STAND/DOUBLE/SPLIT
+// actions the user uses, so the reducer never branches on who's acting except to
+// keep the bankroll tied to the user's hands only. The component owns the timing
+// (DEAL_CARD / NPC turns / DEALER_CARD on timers). Rules math lives in engine.js;
+// this file sequences the game and moves chips. Cards are consumed in order from
+// a predetermined shoe (fetched whole).
 
 import {
     handValue,
@@ -41,16 +45,30 @@ function chipsFor(amount) {
     return chips;
 }
 
+// Where the seats sit relative to the centered user. The user is the middle
+// seat; the bots flank it, split as evenly as possible with the odd one on the
+// left. Returns { left, right, userIndex } where userIndex is the user's index
+// in the left-to-right players array. Keeping the user dead-center means a
+// changing bot count (dynamic mode) never slides the user's hand sideways.
+export function seatLayout(numPlayers) {
+    const npcs = Math.max(0, numPlayers - 1);
+    const right = Math.floor(npcs / 2);
+    const left = npcs - right;
+    return { left, right, userIndex: left };
+}
+
 // --- state shape ---
 // {
-//   phase, shoe, pos, bankroll, bet, lastBet,
-//   hands: [{ cards, bet, status, outcome, payout }],  // status: playing|stood|bust|doubled|blackjack
-//   active,            // index of the hand currently being played
+//   phase, shoe, pos, bankroll, bet, betChips, lastBet,
+//   players: [{ id, kind: 'user'|'npc', type, hands: [{ cards, bet, status, outcome, payout }] }],
+//   userIndex,         // index of the user's seat in players
+//   active: { p, h },  // seat index + hand index currently being played
 //   dealer,            // dealer's cards (hole = dealer[1])
-//   dealStep,          // how many of the 4 opening cards have been dealt
+//   dealStep,          // how many opening cards have been dealt
 //   dealerHoleHidden,  // render dealer[1] face-down until the dealer's turn
-//   lastNet,           // net chips from the last settled round (for the banner)
+//   lastNet,           // net chips from the user's last settled round (for the banner)
 // }
+// Hand status: playing | stood | bust | doubled | blackjack.
 
 export function init({ bankroll = STARTING_BANKROLL, shoe = [], pos = 0 } = {}) {
     return {
@@ -61,8 +79,9 @@ export function init({ bankroll = STARTING_BANKROLL, shoe = [], pos = 0 } = {}) 
         bet: 0,
         betChips: [], // chip values placed for the current bet, for the table display
         lastBet: 0,
-        hands: [],
-        active: 0,
+        players: [],
+        userIndex: 0,
+        active: { p: 0, h: 0 },
         dealer: [],
         dealStep: 0,
         dealerHoleHidden: true,
@@ -79,10 +98,21 @@ export function needsReshuffle(state) {
     return state.pos >= PENETRATION * state.shoe.length;
 }
 
+// Is it the human's turn to act? (The bots play themselves on a timer.)
+export function isUserTurn(state) {
+    return state.phase === "playerTurn" && state.active.p === state.userIndex;
+}
+
+// The hand the user is currently playing, or null.
+function userActiveHand(state) {
+    if (!isUserTurn(state)) return null;
+    return state.players[state.active.p].hands[state.active.h];
+}
+
 // Why the active hand can't double right now — a short reason, or null if it can.
 export function doubleReason(state) {
-    if (state.phase !== "playerTurn") return null;
-    const hand = state.hands[state.active];
+    const hand = userActiveHand(state);
+    if (!hand) return null;
     if (hand.cards.length !== 2) {
         return "You can only double on your opening two cards.";
     }
@@ -92,13 +122,13 @@ export function doubleReason(state) {
 
 // Why the active hand can't split right now — a short reason, or null if it can.
 export function splitReason(state) {
-    if (state.phase !== "playerTurn") return null;
-    const hand = state.hands[state.active];
+    const hand = userActiveHand(state);
+    if (!hand) return null;
     if (hand.cards.length !== 2) {
         return "You can only split your opening two cards.";
     }
     if (!canSplit(hand.cards)) return "You can only split a matching pair.";
-    if (state.hands.length >= MAX_HANDS) {
+    if (state.players[state.active.p].hands.length >= MAX_HANDS) {
         return `You can't have more than ${MAX_HANDS} hands.`;
     }
     if (state.bankroll < hand.bet) return "Not enough chips to split.";
@@ -107,8 +137,18 @@ export function splitReason(state) {
 
 // --- pure helpers ---
 
-function replaceHand(hands, index, hand) {
-    return hands.map((h, i) => (i === index ? hand : h));
+// Replace one hand within one seat, returning a new players array.
+function setHand(players, p, h, hand) {
+    return players.map((seat, i) =>
+        i !== p
+            ? seat
+            : { ...seat, hands: seat.hands.map((hh, j) => (j === h ? hand : hh)) },
+    );
+}
+
+// Replace a seat's whole hands array (used by split).
+function setSeatHands(players, p, hands) {
+    return players.map((seat, i) => (i === p ? { ...seat, hands } : seat));
 }
 
 // Finishing-status for a hand that has just received a card. A split-ace hand
@@ -120,20 +160,28 @@ function statusAfterCard(cards, { aceSplit = false } = {}) {
     return "playing";
 }
 
-// Pay out every hand against the dealer's final hand and move chips. Each hand's
-// stake was already deducted at commit time, so we return stake + profit:
-// bet * (1 + multiplier). lastNet (sum of per-hand profit) is the round's swing.
-function enterSettle(state) {
+// Settle every seat's hands against the dealer's final hand. Each hand's stake
+// was already deducted at commit time, so a user hand returns stake + profit:
+// bet * (1 + multiplier). Only the user's hands move the bankroll; bot results
+// are recorded (outcome/payout) for display but are otherwise cosmetic.
+function settleAll(state) {
     let bankroll = state.bankroll;
-    const hands = state.hands.map((hand) => {
-        const { outcome, multiplier } = settle(hand.cards, state.dealer);
-        bankroll += hand.bet * (1 + multiplier);
-        return { ...hand, outcome, payout: hand.bet * multiplier };
+    let lastNet = 0;
+    const players = state.players.map((seat, p) => {
+        const isUser = p === state.userIndex;
+        const hands = seat.hands.map((hand) => {
+            const { outcome, multiplier } = settle(hand.cards, state.dealer);
+            if (isUser) {
+                bankroll += hand.bet * (1 + multiplier);
+                lastNet += hand.bet * multiplier;
+            }
+            return { ...hand, outcome, payout: hand.bet * multiplier };
+        });
+        return { ...seat, hands };
     });
-    const lastNet = hands.reduce((sum, h) => sum + h.payout, 0);
     return {
         ...state,
-        hands,
+        players,
         bankroll,
         phase: "settle",
         dealerHoleHidden: false,
@@ -142,42 +190,65 @@ function enterSettle(state) {
 }
 
 // All player hands are resolved — reveal the hole card and hand off to the
-// dealer. If every hand busted the dealer doesn't draw; if the dealer is already
-// standing we settle immediately. Otherwise begin the dealer's draw sequence.
+// dealer. If every hand busted the dealer doesn't draw; if the dealer already
+// stands we settle immediately. Otherwise begin the dealer's draw sequence.
 function enterDealerPhase(state) {
     const revealed = { ...state, dealerHoleHidden: false };
-    const anyLive = state.hands.some((h) => h.status !== "bust");
-    if (!anyLive) return enterSettle(revealed);
+    const anyLive = state.players.some((seat) =>
+        seat.hands.some((h) => h.status !== "bust"),
+    );
+    if (!anyLive) return settleAll(revealed);
     if (dealerShouldHit(state.dealer)) {
         return { ...revealed, phase: "dealerTurn" };
     }
-    return enterSettle(revealed);
+    return settleAll(revealed);
 }
 
-// Advance to the next hand that still needs decisions. A freshly-split hand
-// arrives holding a single card, so deal it its second card on activation
-// (split aces then auto-stand). When no playing hands remain, the dealer plays.
-function advance(state) {
-    let { hands, pos } = state;
-    let next = state.active + 1;
+// Find the first hand that still needs to be played, scanning seats left-to-right
+// then hands within a seat. Used right after the opening deal.
+function enterPlay(state) {
+    for (let p = 0; p < state.players.length; p++) {
+        const seat = state.players[p];
+        for (let h = 0; h < seat.hands.length; h++) {
+            if (seat.hands[h].status === "playing") {
+                return { ...state, phase: "playerTurn", active: { p, h } };
+            }
+        }
+    }
+    return enterDealerPhase(state);
+}
 
-    while (next < hands.length) {
-        let hand = hands[next];
-        if (hand.cards.length === 1) {
-            const card = state.shoe[pos];
-            pos += 1;
-            const cards = [hand.cards[0], card];
-            const aceSplit = hand.cards[0].rank === "ACE";
-            hand = { ...hand, cards, status: statusAfterCard(cards, { aceSplit }) };
-            hands = replaceHand(hands, next, hand);
+// Move to the next hand needing a decision after the active one finishes. A
+// freshly-split hand arrives holding a single card, so deal it its second card
+// on activation (split aces then auto-stand). When no playing hands remain, the
+// dealer plays.
+function advance(state) {
+    let { players, pos } = state;
+    let p = state.active.p;
+    let h = state.active.h + 1;
+
+    while (p < players.length) {
+        const seat = players[p];
+        while (h < seat.hands.length) {
+            let hand = seat.hands[h];
+            if (hand.cards.length === 1) {
+                const card = state.shoe[pos];
+                pos += 1;
+                const cards = [hand.cards[0], card];
+                const aceSplit = hand.cards[0].rank === "ACE";
+                hand = { ...hand, cards, status: statusAfterCard(cards, { aceSplit }) };
+                players = setHand(players, p, h, hand);
+            }
+            if (hand.status === "playing") {
+                return { ...state, players, pos, active: { p, h } };
+            }
+            h += 1;
         }
-        if (hand.status === "playing") {
-            return { ...state, hands, pos, active: next, phase: "playerTurn" };
-        }
-        next += 1;
+        p += 1;
+        h = 0;
     }
 
-    return enterDealerPhase({ ...state, hands, pos });
+    return enterDealerPhase({ ...state, players, pos });
 }
 
 // --- reducer ---
@@ -187,6 +258,11 @@ export function reducer(state, action) {
         // Load a fresh shoe (initial fetch and every reshuffle both use this).
         case "RESHUFFLE":
             return { ...state, shoe: action.shoe, pos: 0 };
+
+        // Settings changed — start a fresh betting round with an empty shoe so the
+        // next hand is dealt under the new deck/seat config. Bankroll is preserved.
+        case "CONFIGURE":
+            return init({ bankroll: state.bankroll });
 
         // ---- betting ----
 
@@ -209,8 +285,7 @@ export function reducer(state, action) {
         // Bet the whole bankroll, rounded down to the nearest chip.
         case "ALL_IN": {
             if (state.phase !== "betting") return state;
-            const bet =
-                Math.floor(state.bankroll / SMALLEST_CHIP) * SMALLEST_CHIP;
+            const bet = Math.floor(state.bankroll / SMALLEST_CHIP) * SMALLEST_CHIP;
             return { ...state, bet, betChips: chipsFor(bet) };
         }
 
@@ -223,6 +298,8 @@ export function reducer(state, action) {
             return { ...state, bankroll: state.bankroll + action.amount };
 
         // ---- start a round ----
+        // The component builds the seats (with the bots' personalities and bets)
+        // and passes them in, since seat creation uses randomness.
 
         case "DEAL": {
             if (state.phase !== "betting") return state;
@@ -233,102 +310,112 @@ export function reducer(state, action) {
                 bankroll: state.bankroll - state.bet,
                 lastBet: state.bet,
                 betChips: [], // chips move onto the hand; clear the betting spot
-                hands: [{ cards: [], bet: state.bet, status: "playing", outcome: null }],
+                players: action.players,
+                userIndex: action.userIndex,
                 dealer: [],
-                active: 0,
+                active: { p: 0, h: 0 },
                 dealStep: 0,
                 dealerHoleHidden: true,
                 lastNet: null,
             };
         }
 
-        // One card of the opening deal: player, dealer-up, player, dealer-hole.
+        // One card of the opening deal, in seat order then dealer, twice. The
+        // first round gives the dealer their up-card, the second the hole card.
         case "DEAL_CARD": {
             if (state.phase !== "dealing") return state;
             const card = state.shoe[state.pos];
             const pos = state.pos + 1;
-            const toPlayer = state.dealStep === 0 || state.dealStep === 2;
-            const hands = toPlayer
-                ? replaceHand(state.hands, 0, {
-                    ...state.hands[0],
-                    cards: [...state.hands[0].cards, card],
-                })
-                : state.hands;
-            const dealer = toPlayer ? state.dealer : [...state.dealer, card];
-            const dealStep = state.dealStep + 1;
-            const dealt = { ...state, pos, hands, dealer, dealStep };
+            const perRound = state.players.length + 1;
+            const idx = state.dealStep % perRound;
+            const toDealer = idx === state.players.length;
 
-            if (dealStep < 4) return dealt;
-
-            // Opening deal complete — a natural on either side ends the round at once.
-            const playerBJ = isBlackjack(hands[0].cards);
-            const dealerBJ = isBlackjack(dealer);
-            if (playerBJ || dealerBJ) {
-                const marked = playerBJ
-                    ? replaceHand(hands, 0, { ...hands[0], status: "blackjack" })
-                    : hands;
-                return enterSettle({ ...dealt, hands: marked, dealerHoleHidden: false });
+            let players = state.players;
+            let dealer = state.dealer;
+            if (toDealer) {
+                dealer = [...state.dealer, card];
+            } else {
+                const hand0 = state.players[idx].hands[0];
+                players = setHand(state.players, idx, 0, {
+                    ...hand0,
+                    cards: [...hand0.cards, card],
+                });
             }
-            return { ...dealt, phase: "playerTurn", active: 0 };
+            const dealStep = state.dealStep + 1;
+            const dealt = { ...state, pos, players, dealer, dealStep };
+
+            if (dealStep < perRound * 2) return dealt;
+
+            // Opening deal complete — mark every natural blackjack.
+            const marked = players.map((seat) => ({
+                ...seat,
+                hands: seat.hands.map((h) =>
+                    isBlackjack(h.cards) ? { ...h, status: "blackjack" } : h,
+                ),
+            }));
+            // A dealer natural ends the round at once (everyone settles now).
+            if (isBlackjack(dealer)) {
+                return settleAll({ ...dealt, players: marked, dealerHoleHidden: false });
+            }
+            return enterPlay({ ...dealt, players: marked });
         }
 
-        // ---- player turn ----
+        // ---- player / bot turns (same actions, applied to the active seat) ----
 
         case "HIT": {
             if (state.phase !== "playerTurn") return state;
+            const { p, h } = state.active;
             const card = state.shoe[state.pos];
             const pos = state.pos + 1;
-            const hand = state.hands[state.active];
+            const hand = state.players[p].hands[h];
             const cards = [...hand.cards, card];
             const status = statusAfterCard(cards);
-            const hands = replaceHand(state.hands, state.active, {
-                ...hand,
-                cards,
-                status,
-            });
-            const updated = { ...state, pos, hands };
+            const players = setHand(state.players, p, h, { ...hand, cards, status });
+            const updated = { ...state, pos, players };
             return status === "playing" ? updated : advance(updated);
         }
 
         case "STAND": {
             if (state.phase !== "playerTurn") return state;
-            const hands = replaceHand(state.hands, state.active, {
-                ...state.hands[state.active],
-                status: "stood",
-            });
-            return advance({ ...state, hands });
+            const { p, h } = state.active;
+            const hand = state.players[p].hands[h];
+            const players = setHand(state.players, p, h, { ...hand, status: "stood" });
+            return advance({ ...state, players });
         }
 
         case "DOUBLE": {
             if (state.phase !== "playerTurn") return state;
-            const hand = state.hands[state.active];
-            if (!canDouble(hand.cards) || state.bankroll < hand.bet) return state;
+            const { p, h } = state.active;
+            const isUser = p === state.userIndex;
+            const hand = state.players[p].hands[h];
+            if (!canDouble(hand.cards)) return state;
+            if (isUser && state.bankroll < hand.bet) return state;
             const card = state.shoe[state.pos];
             const pos = state.pos + 1;
             const cards = [...hand.cards, card];
             const status = isBust(cards) ? "bust" : "doubled";
-            const hands = replaceHand(state.hands, state.active, {
+            const players = setHand(state.players, p, h, {
                 ...hand,
                 cards,
                 bet: hand.bet * 2,
                 status,
             });
-            return advance({ ...state, pos, bankroll: state.bankroll - hand.bet, hands });
+            const bankroll = isUser ? state.bankroll - hand.bet : state.bankroll;
+            return advance({ ...state, pos, players, bankroll });
         }
 
         case "SPLIT": {
             if (state.phase !== "playerTurn") return state;
-            const hand = state.hands[state.active];
-            if (
-                !canSplit(hand.cards) ||
-                state.hands.length >= MAX_HANDS ||
-                state.bankroll < hand.bet
-            ) {
-                return state;
-            }
+            const { p, h } = state.active;
+            const isUser = p === state.userIndex;
+            const seat = state.players[p];
+            const hand = seat.hands[h];
+            if (!canSplit(hand.cards) || seat.hands.length >= MAX_HANDS) return state;
+            if (isUser && state.bankroll < hand.bet) return state;
+
             const [first, second] = hand.cards;
-            // The first split hand gets its second card now; the second hand keeps a
-            // lone card until advance() activates and fills it.
+            // The first split hand gets its second card now; the second keeps a lone
+            // card until advance() activates and fills it.
             const card = state.shoe[state.pos];
             const pos = state.pos + 1;
             const firstCards = [first, card];
@@ -344,14 +431,11 @@ export function reducer(state, action) {
                 status: "playing",
                 outcome: null,
             };
-            const hands = [...state.hands];
-            hands.splice(state.active, 1, firstHand, secondHand);
-            const updated = {
-                ...state,
-                pos,
-                bankroll: state.bankroll - hand.bet,
-                hands,
-            };
+            const hands = [...seat.hands];
+            hands.splice(h, 1, firstHand, secondHand);
+            const players = setSeatHands(state.players, p, hands);
+            const bankroll = isUser ? state.bankroll - hand.bet : state.bankroll;
+            const updated = { ...state, pos, players, bankroll };
             // Stay on the first split hand unless it auto-finished (e.g. split aces).
             return firstHand.status === "playing" ? updated : advance(updated);
         }
@@ -364,7 +448,7 @@ export function reducer(state, action) {
             const pos = state.pos + 1;
             const dealer = [...state.dealer, card];
             const updated = { ...state, pos, dealer };
-            return dealerShouldHit(dealer) ? updated : enterSettle(updated);
+            return dealerShouldHit(dealer) ? updated : settleAll(updated);
         }
 
         // ---- next round ----
@@ -376,8 +460,9 @@ export function reducer(state, action) {
                 phase: "betting",
                 bet: 0,
                 betChips: [],
-                hands: [],
-                active: 0,
+                players: [],
+                userIndex: 0,
+                active: { p: 0, h: 0 },
                 dealer: [],
                 dealStep: 0,
                 dealerHoleHidden: true,

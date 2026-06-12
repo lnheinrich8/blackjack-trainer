@@ -457,6 +457,11 @@ h3,
   justify-content: center;
 }
 
+/* Seats laid out so the user stays dead-center: equal-width left/right wings
+   flank a fixed-width center seat. Bots fill the wings (hugging toward the
+   middle), so a changing bot count never slides the user's hand sideways. The
+   2rem gap is uniform — between wings and the center, and between bots in a
+   wing. */
 .table__players {
   display: flex;
   justify-content: center;
@@ -464,6 +469,34 @@ h3,
   flex-wrap: wrap;
   gap: 2rem;
   width: 100%;
+}
+
+.seats {
+  display: flex;
+  align-items: flex-end;
+  gap: 2rem;
+}
+
+.seats--left {
+  flex: 1 1 0;
+  justify-content: flex-end;
+}
+
+.seats--right {
+  flex: 1 1 0;
+  justify-content: flex-start;
+}
+
+.seats--user {
+  flex: 0 0 auto;
+}
+
+/* A seat's hand(s): split hands sit side by side, a little tighter than the
+   gap between separate seats. */
+.playseat {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
 }
 
 /* a seat = a table spot (flag + that hand's cards), not a literal chair */
@@ -909,9 +942,13 @@ h3,
   gap: 0;
 }
 
+/* The bankroll doubles as the Play top-bar's hover trigger (it carries the
+   .drillstatus__toggle base too), so reset that base's gold/bold back to the
+   bankroll's muted look. */
 .play__bankroll {
   color: var(--muted);
   font-size: 1.05rem;
+  font-weight: 400;
 }
 
 .play__result {
@@ -1158,7 +1195,9 @@ h3,
 .bet-spot .chipstacks {
   position: absolute;
   left: 100%;
-  top: 0;
+  /* Anchor the stacks at the bottom so they grow UPWARD from a fixed base as
+     chips are added (rather than the pile sliding down from a top anchor). */
+  bottom: 0;
   margin-left: 1.5rem;
 }
 
