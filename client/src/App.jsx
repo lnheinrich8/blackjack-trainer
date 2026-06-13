@@ -8,9 +8,18 @@ import { useLocalStorage } from "./features/shared/hooks/useLocalStorage";
 const DEFAULT_STATS = { totalDrills: 0, totalCorrect: 0, history: [] };
 const HISTORY_LIMIT = 20;
 
+// Testing-mode betting history (one entry per settled round). Capped larger than
+// the drill history since the bet-strategy aggregates want a decent sample.
+const DEFAULT_BET_STATS = { history: [] };
+const BET_HISTORY_LIMIT = 200;
+
 function App() {
     // Stats persist to localStorage, so a returning user keeps their progress.
     const [stats, setStats] = useLocalStorage("bjack.stats", DEFAULT_STATS);
+    const [betStats, setBetStats] = useLocalStorage(
+        "bjack.play.betstats",
+        DEFAULT_BET_STATS,
+    );
     const [section, setSection] = useState("play");
 
     // Called when a count is graded — fold the result into lifetime stats and the
@@ -34,6 +43,17 @@ function App() {
 
     const resetStats = () => setStats(DEFAULT_STATS);
 
+    // Called when a Testing-mode round settles — record the bet placed, the true
+    // count it was placed at, and how the round netted out, so the Stats page can
+    // judge how well the player's bets track the count.
+    const recordBet = (entry) => {
+        setBetStats((prev) => ({
+            history: [entry, ...prev.history].slice(0, BET_HISTORY_LIMIT),
+        }));
+    };
+
+    const resetBetStats = () => setBetStats(DEFAULT_BET_STATS);
+
     const accuracy =
         stats.totalDrills === 0
             ? "—"
@@ -49,8 +69,15 @@ function App() {
 
             <main className="site__main">
                 {section === "train" && <Trainer onResult={recordResult} />}
-                {section === "play" && <Play />}
-                {section === "stats" && <Stats stats={stats} onReset={resetStats} />}
+                {section === "play" && <Play onRecordBet={recordBet} />}
+                {section === "stats" && (
+                    <Stats
+                        stats={stats}
+                        betStats={betStats}
+                        onReset={resetStats}
+                        onResetBets={resetBetStats}
+                    />
+                )}
             </main>
         </div>
     );

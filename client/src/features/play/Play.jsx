@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { getShoe } from "../../api/client";
 import { useLocalStorage } from "../shared/hooks/useLocalStorage";
 import { readShoe, writeShoe, clearShoe } from "../shared/utils/shoeCache";
@@ -103,7 +103,7 @@ function buildSeats(botTypes, userBet) {
 // predetermined shoe. The reducer (state.js) holds the game; this component owns
 // the side effects — fetching shoes, persisting the bankroll, and ticking the
 // deal/dealer animations on timers (same approach as the trainer's TableDrill).
-function Play() {
+function Play({ onRecordBet }) {
     const [savedBankroll, setSavedBankroll] = useLocalStorage(
         "bjack.play.bankroll",
         STARTING_BANKROLL,
@@ -220,6 +220,12 @@ function Play() {
     // deal seeds it). In state so the betting-phase seat preview reflects it.
     const [roster, setRoster] = useState(null);
 
+    // The true count a Testing-mode bet was placed at, stashed when the deal
+    // starts and recorded once the round settles. Null when not in Testing mode
+    // (so that round isn't tracked) or once it's been recorded. A ref, not state,
+    // since only effects/callbacks touch it and it shouldn't trigger renders.
+    const pendingTcRef = useRef(null);
+
     // Whether a candidate config actually changes the game from the current one
     // (Dynamic always differs; otherwise compare the concrete values).
     const configDiffers = (next) => {
@@ -288,9 +294,48 @@ function Play() {
             const count = Math.max(0, savedConfig.config.numPlayers - 1);
             botTypes = Array.from({ length: count }, () => pick(PLAYER_TYPES));
         }
+        // In Testing mode, stash the true count this bet is being placed at (the
+        // count of everything seen so far, before this round is dealt) so the
+        // round can be folded into the bet-strategy stats once it settles.
+        if (isTestingMode(savedConfig.difficultyId)) {
+            const rc = runningCount(
+                state.shoe,
+                state.pos,
+                state.dealer,
+                state.dealerHoleHidden,
+            );
+            pendingTcRef.current = decks > 0 ? rc / decks : 0;
+        } else {
+            pendingTcRef.current = null;
+        }
+
         const { players, userIndex } = buildSeats(botTypes, state.bet);
         dispatch({ type: "DEAL", players, userIndex });
-    }, [savedConfig.difficultyId, savedConfig.config.numPlayers, state.bet, roster]);
+    }, [
+        savedConfig.difficultyId,
+        savedConfig.config.numPlayers,
+        state.bet,
+        state.shoe,
+        state.pos,
+        state.dealer,
+        state.dealerHoleHidden,
+        decks,
+        roster,
+    ]);
+
+    // Once a Testing-mode round settles, record the bet, the count it was placed
+    // at, and the round's net result, then clear the pending count so we record
+    // each round exactly once.
+    useEffect(() => {
+        if (state.phase !== "settle" || pendingTcRef.current === null) return;
+        onRecordBet({
+            tc: pendingTcRef.current,
+            bet: state.lastBet,
+            net: state.lastNet,
+            decks,
+        });
+        pendingTcRef.current = null;
+    }, [state.phase, state.lastBet, state.lastNet, onRecordBet, decks]);
 
     // Keyboard controls. Spacebar deals / advances; during betting 1-4 add a chip
     // (Shift+1-4 removes one); during the player's turn Z=hit, X=stand, C=double,
