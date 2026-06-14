@@ -1,10 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { CHIP_DEFS } from "../chips";
+import ChipStacks from "./ChipStacks";
 
 // Chip betting for the betting phase. Add chips up to your bankroll, then deal
 // with Spacebar. `nudge` increments when the player tries to deal with no chips
 // down, to flash the "Add chips" hint.
-function BetControls({ bet, bankroll, onAddChip, nudge = 0 }) {
+function BetControls({
+    bet,
+    bankroll,
+    betChips = [],
+    onAddChip,
+    onRemoveChip,
+    nudge = 0,
+}) {
     // Flash only when `nudge` actually changes while we're mounted — NOT on mount.
     // BetControls remounts every betting phase, so keying the flash off `nudge > 0`
     // alone would (wrongly) replay it at the start of each new hand.
@@ -18,7 +26,7 @@ function BetControls({ bet, bankroll, onAddChip, nudge = 0 }) {
     }, [nudge]);
 
     return (
-        <div className="bet">
+        <div className={`bet bet--controls${bet > 0 ? " bet--placed" : ""}`}>
             <div className="bet__line">
                 <div className="bet__chips">
                     {CHIP_DEFS.map(({ value, color }) => (
@@ -38,20 +46,29 @@ function BetControls({ bet, bankroll, onAddChip, nudge = 0 }) {
                 </span>
             </div>
 
-            <p className="belt__keys">
-                <span
-                    key={flash}
-                    className={flash > 0 ? "bet__nudge bet__nudge--flash" : "bet__nudge"}
-                >
-                    Add chips
-                </span>
-                , then press <strong>Spacebar</strong> to deal. Click a stack to remove a
-                chip.
-            </p>
+            {/* The two instruction lines, with the chip stacks anchored off to
+                their right (vertically centered between the lines, growing
+                upward) so they never push the buttons or the running bet around. */}
+            <div className="bet__notes">
+                <p className="belt__keys">
+                    <span
+                        key={flash}
+                        className={
+                            flash > 0 ? "bet__nudge bet__nudge--flash" : "bet__nudge"
+                        }
+                    >
+                        Add chips
+                    </span>
+                    , then press <strong>Spacebar</strong> to deal. Click a stack to
+                    remove a chip.
+                </p>
 
-            <p className="belt__keys">
-                Press <strong>R</strong> to reshuffle and refill the shoe.
-            </p>
+                <p className="belt__keys">
+                    Press <strong>R</strong> to reshuffle and refill the shoe.
+                </p>
+
+                <ChipStacks chips={betChips} onRemove={onRemoveChip} />
+            </div>
         </div>
     );
 }

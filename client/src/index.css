@@ -216,6 +216,63 @@ h3,
   font-size: 1rem;
 }
 
+/* Sits below the Decks/Other-players row; the top gap matches the row gap above
+   the trainer modal's "Dealing speed" field (.config-fields gap). */
+.field--players {
+  margin-top: 0.75rem;
+}
+
+/* Per-player behavior list in the Play config modal — sized to show two bordered
+   tiles before it starts scrolling; the rest scroll into view with a minimal
+   thumb. The tiles carry the border; the list container itself has none. */
+.players {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  /* 2 tiles (3.325rem) + 1 gap (0.5rem) + vertical padding (1rem) */
+  max-height: 8.15rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-2) transparent;
+}
+
+.players::-webkit-scrollbar {
+  width: 6px;
+}
+
+.players::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.players::-webkit-scrollbar-thumb {
+  background: var(--panel-2);
+  border-radius: 3px;
+}
+
+.players__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex: 0 0 auto;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--panel-2);
+  border-radius: 8px;
+}
+
+.players__row select {
+  height: 2.4rem;
+  flex: 0 0 auto;
+}
+
+.players__name {
+  font-size: 0.95rem;
+  color: var(--text);
+}
+
 /* ---- buttons ---- */
 .btn {
   border: none;
@@ -1336,24 +1393,65 @@ h3,
   margin-top: 1rem;
 }
 
-/* The two instruction lines should sit 0.75rem apart to match the Train page's
-   count prompt. .bet's 0.9rem flex gap already separates them, so pull the
-   second line up by the difference to land on exactly 0.75rem. */
-.bet .belt__keys + .belt__keys {
-  margin-top: calc(0.75rem - 0.9rem);
+/* The betting controls only. Their inner pieces are nudged left (.bet__line -80px,
+   the instruction lines -40px) for the playing layout, which leaves the visible
+   content sitting ~50px left of this box's true center. So when the bet is empty
+   we shift right by that much to land the content dead-center under the table;
+   once the first chip is down it slides left into the playing position. */
+.bet--controls {
+  transform: translateX(50px);
+  transition: transform 0.35s ease;
+}
+
+/* Chips are down: shift the whole belt left. The chip stacks live inside .bet, so
+   the first chip is placed to the right of the centered belt (at the usual gap)
+   and slides in together with everything else when this class is added. */
+.bet--controls.bet--placed {
+  transform: translateX(-100px);
 }
 
 /* Chips stay centered; the running bet floats to their right (absolutely
-   positioned) so its growing text never nudges the chip buttons. */
+   positioned) so its growing text never nudges the chip buttons. The whole row
+   is nudged left so the chip stacks have room out to the right. */
 .bet__line {
   position: relative;
   display: flex;
   justify-content: center;
+  transform: translateX(-80px);
 }
 
 .bet__chips {
   display: flex;
   gap: 0.6rem;
+}
+
+/* The two instruction lines, with the chip stacks parked off to their right. No
+   flex gap here: the second line's own 0.75rem margin-top sets the spacing, so it
+   matches the Train page's two-line gap (which works the same way). */
+.bet__notes {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* The chip buttons + running bet are shifted 80px left, so nudge the instruction
+   text left to sit under the middle of that row (between the leftmost chip's left
+   edge and the bet amount's right edge). Transform only — it doesn't change the
+   layout box, so the chip stacks' right-side anchor is unaffected. Both lines
+   shift equally, so they stay centered with each other. */
+.bet__notes .belt__keys {
+  transform: translateX(-40px);
+}
+
+/* Chip stacks live to the right of the instruction text — their base pinned to
+   the vertical midpoint between the two lines (bottom: 50%) so the piles grow
+   straight upward as chips are added, never sliding down. */
+.bet__notes .chipstacks {
+  position: absolute;
+  left: 100%;
+  bottom: calc(50% - 50px);
+  margin-left: 10px;
 }
 
 /* Shared chip face — color comes from the .chip--<color> modifier; size differs
@@ -1450,7 +1548,7 @@ h3,
   left: 100%;
   top: 50%;
   transform: translateY(-50%);
-  margin-left: 2.5rem;
+  margin-left: 1.25rem;
   font-size: 1.1rem;
   color: var(--muted);
   white-space: nowrap;
@@ -1461,29 +1559,19 @@ h3,
   color: var(--text);
 }
 
-/* Betting spot: the empty seat stays centered; chips float to its right
-   (absolutely positioned) so adding them doesn't shift the square. */
+/* Betting spot: the empty "You" seat, centered. */
 .bet-spot {
   position: relative;
   display: flex;
   justify-content: center;
 }
 
-.bet-spot .chipstacks {
-  position: absolute;
-  left: 100%;
-  /* Anchor the stacks at the bottom so they grow UPWARD from a fixed base as
-     chips are added (rather than the pile sliding down from a top anchor). */
-  bottom: 0;
-  margin-left: 1.5rem;
-}
-
-/* Chip stacks drawn on the felt — one pile per denomination. */
+/* Chip stacks — one pile per denomination. */
 .chipstacks {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  gap: 1.4rem;
+  gap: 0.7rem;
   min-height: 76px;
 }
 

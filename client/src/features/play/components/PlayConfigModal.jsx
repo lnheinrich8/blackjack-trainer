@@ -1,10 +1,10 @@
-import { DIFFICULTIES } from "../playModes";
+import { DIFFICULTIES, BEHAVIORS, behaviorsFor, resizeBehaviors } from "../playModes";
 
 // The Play page settings modal. Mirrors the trainer's ConfigModal: pick a
-// difficulty (which fills in concrete values) or edit Decks/Players directly —
-// editing flips the selection to "Custom". Dynamic hides the values since the
-// table size drifts as you play. Changes are pushed up to Play, which persists
-// them to localStorage.
+// difficulty (which fills in concrete values) or edit Decks/Players/behaviors
+// directly — editing any of them flips the selection to "Custom". Dynamic hides
+// the values since the table size drifts as you play. Changes are pushed up to
+// Play, which persists them to localStorage.
 function PlayConfigModal({
     difficultyId,
     config,
@@ -15,6 +15,16 @@ function PlayConfigModal({
 }) {
     const isDynamic = difficultyId === "dynamic";
     const set = (patch) => onChangeConfig({ ...config, ...patch });
+
+    // The per-other-player behaviors, kept the same length as the seat count.
+    const behaviors = behaviorsFor(config);
+
+    // Changing the player count resizes the behaviors list to match.
+    const setNumPlayers = (numPlayers) =>
+        set({ numPlayers, behaviors: resizeBehaviors(config.behaviors, numPlayers) });
+
+    const setBehavior = (index, value) =>
+        set({ behaviors: behaviors.map((b, i) => (i === index ? value : b)) });
 
     return (
         <div className="modal" onClick={onClose}>
@@ -82,7 +92,7 @@ function PlayConfigModal({
                             <select
                                 value={config.numPlayers - 1}
                                 onChange={(e) =>
-                                    set({ numPlayers: Number(e.target.value) + 1 })
+                                    setNumPlayers(Number(e.target.value) + 1)
                                 }
                             >
                                 {[0, 1, 2, 3, 4].map((n) => (
@@ -92,6 +102,32 @@ function PlayConfigModal({
                                 ))}
                             </select>
                         </label>
+                    </div>
+                )}
+
+                {/* One row per other player to set how they play. Shows two tiles
+                    before the list starts scrolling. Hidden in Dynamic mode (seats
+                    come and go on their own) and when there are no other players. */}
+                {!isDynamic && behaviors.length > 0 && (
+                    <div className="field field--players">
+                        <span>Player behavior</span>
+                        <ul className="players">
+                            {behaviors.map((behavior, i) => (
+                                <li key={i} className="players__row">
+                                    <span className="players__name">Player {i + 1}</span>
+                                    <select
+                                        value={behavior}
+                                        onChange={(e) => setBehavior(i, e.target.value)}
+                                    >
+                                        {BEHAVIORS.map((opt) => (
+                                            <option key={opt.id} value={opt.id}>
+                                                {opt.label}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </li>
+                            ))}
+                        </ul>
                     </div>
                 )}
 

@@ -21,6 +21,7 @@ import {
     labelFor,
     statusDetails,
     isTestingMode,
+    behaviorsFor,
 } from "./playModes";
 import PlayTable from "./components/PlayTable";
 import BetControls from "./components/BetControls";
@@ -97,6 +98,26 @@ function buildSeats(botTypes, userBet) {
         hands: [{ cards: [], bet: s.bet, status: "playing", outcome: null }],
     }));
     return { players, userIndex };
+}
+
+// The bots a Dynamic table opens with — a fresh roster of random personalities.
+function seedRoster() {
+    return Array.from({ length: DYNAMIC_START_BOTS }, () => pick(PLAYER_TYPES));
+}
+
+// Drift a Dynamic roster by one between hands: ~half the time a single bot joins
+// (up to the cap) or leaves. Returns the next roster (the input is left untouched).
+function driftRoster(roster) {
+    const next = [...roster];
+    if (Math.random() < DYNAMIC_CHANGE_PROB) {
+        const leaving = Math.random() < 0.5;
+        if (leaving && next.length > 0) {
+            next.splice(Math.floor(Math.random() * next.length), 1);
+        } else if (next.length < MAX_BOTS) {
+            next.push(pick(PLAYER_TYPES));
+        }
+    }
+    return next;
 }
 
 // The Play page: real blackjack against the dealer, dealt from a server-provided
@@ -267,32 +288,22 @@ function Play({ onRecordBet }) {
         applyConfig({ difficultyId: "custom", config: savedConfig.config });
 
     // Build the seats and start the deal (used for the first hand and after each).
-    // Static difficulties use a fixed bot count; Dynamic keeps a persistent bot
-    // roster that drifts between hands (bots join/leave) — the user is always
-    // seated. The roster is null until the first dynamic deal and is reset on a
-    // config change (see applyConfig).
+    // Static difficulties use a fixed bot count; Dynamic seats its persistent bot
+    // roster, which is seeded on the first deal and then drifts on the way back to
+    // betting (see the settle handler) so joins/leaves show before the deal. The
+    // user is always seated; the roster resets on a config change (see applyConfig).
     const startDeal = useCallback(() => {
         let botTypes;
         if (savedConfig.difficultyId === "dynamic") {
-            if (roster === null) {
-                botTypes = Array.from({ length: DYNAMIC_START_BOTS }, () =>
-                    pick(PLAYER_TYPES),
-                );
-            } else {
-                botTypes = [...roster];
-                if (Math.random() < DYNAMIC_CHANGE_PROB) {
-                    const leaving = Math.random() < 0.5;
-                    if (leaving && botTypes.length > 0) {
-                        botTypes.splice(Math.floor(Math.random() * botTypes.length), 1);
-                    } else if (botTypes.length < MAX_BOTS) {
-                        botTypes.push(pick(PLAYER_TYPES));
-                    }
-                }
-            }
+            // The roster already reflects this round's seats: it's seeded on the
+            // first deal and drifts when the player returns to betting after each
+            // hand, so the join/leave is visible before the cards come out.
+            botTypes = roster ?? seedRoster();
             setRoster(botTypes);
         } else {
-            const count = Math.max(0, savedConfig.config.numPlayers - 1);
-            botTypes = Array.from({ length: count }, () => pick(PLAYER_TYPES));
+            // Static difficulties seat exactly the personalities the user chose in
+            // the config modal (one per other player).
+            botTypes = behaviorsFor(savedConfig.config);
         }
         // In Testing mode, stash the true count this bet is being placed at (the
         // count of everything seen so far, before this round is dealt) so the
@@ -313,7 +324,7 @@ function Play({ onRecordBet }) {
         dispatch({ type: "DEAL", players, userIndex });
     }, [
         savedConfig.difficultyId,
-        savedConfig.config.numPlayers,
+        savedConfig.config,
         state.bet,
         state.shoe,
         state.pos,
@@ -363,6 +374,12 @@ function Play({ onRecordBet }) {
                     }
                 } else if (state.phase === "settle") {
                     e.preventDefault();
+                    // Returning to betting: drift the Dynamic roster now so any bot
+                    // join/leave shows up while the player places their next bet,
+                    // not when the deal starts.
+                    if (savedConfig.difficultyId === "dynamic") {
+                        setRoster((r) => (r === null ? r : driftRoster(r)));
+                    }
                     dispatch({ type: "NEXT_ROUND" });
                 }
                 return;
@@ -429,7 +446,15 @@ function Play({ onRecordBet }) {
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [state, dealDisabled, shoeLoading, modalOpen, decks, startDeal]);
+    }, [
+        state,
+        dealDisabled,
+        shoeLoading,
+        modalOpen,
+        decks,
+        startDeal,
+        savedConfig.difficultyId,
+    ]);
 
     // Clear the blocker message 3 seconds after it (re)appears.
     useEffect(() => {
@@ -504,8 +529,6 @@ function Play({ onRecordBet }) {
                         active={state.active}
                         phase={state.phase}
                         previewBots={previewBots}
-                        betChips={state.betChips}
-                        onRemoveChip={(value) => dispatch({ type: "REMOVE_CHIP", value })}
                         cardsRemaining={state.shoe.length - state.pos}
                         shoeSize={state.shoe.length}
                     />
@@ -527,7 +550,11 @@ function Play({ onRecordBet }) {
                             <BetControls
                                 bet={state.bet}
                                 bankroll={state.bankroll}
+                                betChips={state.betChips}
                                 onAddChip={(value) => dispatch({ type: "ADD_CHIP", value })}
+                                onRemoveChip={(value) =>
+                                    dispatch({ type: "REMOVE_CHIP", value })
+                                }
                                 nudge={nudge}
                             />
                         ))}

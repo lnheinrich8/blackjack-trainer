@@ -1,5 +1,4 @@
 import Hand from "./Hand";
-import ChipStacks from "./ChipStacks";
 import Shoe from "../../shared/components/Shoe";
 import { handValue, isBlackjack } from "../engine";
 import { seatLayout } from "../state";
@@ -64,8 +63,6 @@ function PlayTable({
     active,
     phase,
     previewBots = 0,
-    betChips = [],
-    onRemoveChip,
     cardsRemaining = 0,
     shoeSize = 0,
 }) {
@@ -124,9 +121,6 @@ function PlayTable({
                     {betting ? (
                         <div className="bet-spot">
                             <Hand label="You" cards={[]} isUser />
-                            {betChips.length > 0 && (
-                                <ChipStacks chips={betChips} onRemove={onRemoveChip} />
-                            )}
                         </div>
                     ) : (
                         <Seat

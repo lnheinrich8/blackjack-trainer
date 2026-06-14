@@ -1,16 +1,29 @@
 // Difficulty configuration for the Play page — the same shape as the trainer's
 // modes.js, minus the counting-specific bits (no reveal speed, no "hands before
-// count", no Extreme tier). A Play config is just { decks, numPlayers }, where
-// numPlayers counts every seat including the user. "Dynamic" seats players that
-// come and go between hands (handled by the game engine in a later phase).
+// count", no Extreme tier). A Play config is { decks, numPlayers, behaviors },
+// where numPlayers counts every seat including the user and behaviors is one
+// personality id per OTHER player (length numPlayers - 1). "Dynamic" seats
+// players that come and go between hands, so it ignores behaviors and assigns
+// personalities at random.
 
-// Fixed difficulty presets shown in the Play config modal.
+// The personalities a seated bot can play with, in modal-display order. The ids
+// must match strategy.js's PLAYER_TYPES (that module owns the actual decisions).
+export const BEHAVIORS = [
+    { id: "book", label: "By the book" },
+    { id: "loose", label: "Mostly by the book" },
+    { id: "erratic", label: "Erratic" },
+];
+
+export const DEFAULT_BEHAVIOR = "book";
+
+// Fixed difficulty presets shown in the Play config modal. behaviors always has
+// numPlayers - 1 entries (one per other player).
 export const PRESETS = {
-    testing: { decks: 1, numPlayers: 1 }, // same as easy; reveals the running count
-    easy: { decks: 1, numPlayers: 1 }, // heads-up: just you
-    normal: { decks: 4, numPlayers: 3 }, // you plus a couple of others
-    hard: { decks: 8, numPlayers: 5 }, // max decks, a full table
-    dynamic: { decks: 8, numPlayers: 4 }, // max decks; seat count drifts as you play
+    testing: { decks: 1, numPlayers: 1, behaviors: [] }, // same as easy; reveals the count
+    easy: { decks: 1, numPlayers: 1, behaviors: [] }, // heads-up: just you
+    normal: { decks: 4, numPlayers: 3, behaviors: ["book", "loose"] },
+    hard: { decks: 8, numPlayers: 5, behaviors: ["book", "loose", "loose", "erratic"] },
+    dynamic: { decks: 8, numPlayers: 4, behaviors: ["book", "loose", "erratic"] },
 };
 
 // Order shown in the modal. "Custom" is derived (selected automatically when the
@@ -29,6 +42,22 @@ export const DEFAULT_DIFFICULTY = "easy";
 // count in the bankroll hover stats.
 export function isTestingMode(difficultyId) {
     return difficultyId === "testing" || difficultyId === "testing-custom";
+}
+
+// Grow or shrink a behaviors array to match a seat count (numPlayers - 1 other
+// players), padding new slots with the default personality and dropping extras.
+// Tolerates a missing array (legacy saved configs predate behaviors).
+export function resizeBehaviors(behaviors, numPlayers) {
+    const need = Math.max(0, numPlayers - 1);
+    const next = (behaviors ?? []).slice(0, need);
+    while (next.length < need) next.push(DEFAULT_BEHAVIOR);
+    return next;
+}
+
+// A config's behaviors, normalized to the right length — safe to read anywhere
+// even if the stored config is from before behaviors existed.
+export function behaviorsFor(config) {
+    return resizeBehaviors(config.behaviors, config.numPlayers);
 }
 
 export function labelFor(difficultyId) {
