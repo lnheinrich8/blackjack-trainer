@@ -30,12 +30,12 @@ import PlayConfigModal from "./components/PlayConfigModal";
 import DrillStatus from "../shared/components/DrillStatus";
 import { CHIP_DEFS } from "./chips";
 
-// Number-row / numpad hotkeys → chip value (1=$5, 2=$25, 3=$100, 4=$500). Keyed
-// by e.code so it's layout-independent and unaffected by Shift (which we read
-// separately to remove a chip instead of add). Only the first four chips get a
-// key — 5 is reserved for all-in, so the $1000 chip is click-only.
+// Number-row / numpad hotkeys → chip value (1=$5, 2=$25, 3=$100, 4=$500,
+// 5=$1000). Keyed by e.code so it's layout-independent and unaffected by Shift
+// (which we read separately to remove a chip instead of add). A is the all-in
+// key (Shift+A clears the bet).
 const CHIP_KEYS = {};
-CHIP_DEFS.slice(0, 4).forEach((chip, i) => {
+CHIP_DEFS.forEach((chip, i) => {
     CHIP_KEYS[`Digit${i + 1}`] = chip.value;
     CHIP_KEYS[`Numpad${i + 1}`] = chip.value;
 });
@@ -348,8 +348,8 @@ function Play({ onRecordBet }) {
         pendingTcRef.current = null;
     }, [state.phase, state.lastBet, state.lastNet, onRecordBet, decks]);
 
-    // Keyboard controls. Spacebar deals / advances; during betting 1-4 add a chip
-    // (Shift+1-4 removes one); during the player's turn Z=hit, X=stand, C=double,
+    // Keyboard controls. Spacebar deals / advances; during betting 1-5 add a chip
+    // (Shift+1-5 removes one); during the player's turn Z=hit, X=stand, C=double,
     // V=split. Trying to double/split when it isn't allowed shows a 3s explanation.
     useEffect(() => {
         const onKey = (e) => {
@@ -395,8 +395,8 @@ function Play({ onRecordBet }) {
                 return;
             }
 
-            // Chip hotkeys (betting only): 1-4 add a chip, Shift+1-4 remove one;
-            // 5 bets the whole bankroll (all in), Shift+5 clears the table.
+            // Chip hotkeys (betting only): 1-5 add a chip, Shift+1-5 remove one;
+            // A bets the whole bankroll (all in), Shift+A clears the table.
             if (state.phase === "betting") {
                 const value = CHIP_KEYS[e.code];
                 if (value) {
@@ -406,7 +406,7 @@ function Play({ onRecordBet }) {
                             ? { type: "REMOVE_CHIP", value }
                             : { type: "ADD_CHIP", value },
                     );
-                } else if (e.code === "Digit5" || e.code === "Numpad5") {
+                } else if (e.code === "KeyA") {
                     e.preventDefault();
                     dispatch(e.shiftKey ? { type: "CLEAR_BET" } : { type: "ALL_IN" });
                 }

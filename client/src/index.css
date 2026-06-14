@@ -162,9 +162,10 @@ h3,
    side, centered; they collapse to a single stacked column on narrow windows. */
 .stats-page {
   width: 100%;
-  /* .site__main pads 2rem on top; -0.5rem makes the gap below the menubar 1.5rem,
-     matching the gap between the sections. */
-  margin: -0.5rem auto 0;
+  /* .site__main pads 2rem top and bottom; -0.5rem on each makes both the gap below
+     the menubar and the gap above the page bottom 1.5rem, matching the gap between
+     the sections. */
+  margin: -0.5rem auto;
   display: flex;
   flex-direction: row;
   align-items: flex-start;
