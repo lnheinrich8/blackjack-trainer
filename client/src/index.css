@@ -38,6 +38,30 @@ textarea {
   user-select: text;
 }
 
+/* Window (page) scrollbars, vertical and horizontal: everything transparent
+   except a rounded thumb. Scoped to the document element (html) so the existing
+   custom container scrollbars (.players, .stats__history--scroll) are untouched —
+   their own ::-webkit-scrollbar rules and scrollbar-color override these. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-2) transparent;
+}
+
+html::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+html::-webkit-scrollbar-track,
+html::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: var(--panel-2);
+  border-radius: 5px;
+}
+
 /* A classic display serif for headings & the brand gives the casino feel. */
 h1,
 h2,
@@ -150,6 +174,7 @@ h3,
 /* ---- centered stage ---- */
 .site__main {
   flex: 1;
+  min-height: 0; /* let a full-height child (Coach chat) scroll internally instead of growing the page */
   width: 100%;
   max-width: 1000px;
   margin: 0 auto;
@@ -433,6 +458,176 @@ h3,
 .stats__empty {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+/* AI coach page: a single centered panel, same top/side gutters as .stats-page. */
+/* ---- AI coach: a full-height LLM chat (Claude/ChatGPT-style) ---- */
+.coach-page {
+  flex: 1; /* fill the main area so the transcript scrolls and the composer pins */
+  min-height: 0;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  position: relative; /* anchor the floating scroll-to-bottom button */
+}
+
+.coach__header {
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--panel-2);
+}
+
+.coach__title {
+  margin: 0;
+}
+
+.coach__tagline {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.coach__chat {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+  padding: 1.5rem 0.25rem;
+}
+
+/* Empty state, centered in the transcript area. */
+.coach__placeholder {
+  margin: auto;
+  max-width: 44ch;
+  text-align: center;
+  color: var(--muted);
+}
+
+.coach__placeholder-lead {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+  color: var(--text);
+}
+
+.coach__examples {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.coach__msg {
+  line-height: 1.6;
+  font-size: 0.97rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* User: a neutral right-aligned bubble (no gold). */
+.coach__msg--user {
+  align-self: flex-end;
+  max-width: 80%;
+  padding: 0.7rem 1rem;
+  border-radius: 16px;
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* Assistant: full-width, no bubble, like the chat products. */
+.coach__msg--assistant {
+  align-self: stretch;
+  color: var(--text);
+}
+
+.coach__msg--pending {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.coach__error {
+  margin: 0.5rem 0 0;
+  color: var(--lose);
+  font-size: 0.9rem;
+}
+
+/* Floating jump-to-latest button, centered just above the composer (shown only
+   when the user has scrolled up from the bottom). */
+.coach__scrolldown {
+  position: absolute;
+  left: 50%;
+  bottom: 5rem;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--panel-2);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease;
+}
+
+.coach__scrolldown:hover {
+  background: var(--panel-2);
+}
+
+/* Composer: a rounded pill pinned below the transcript. */
+.coach__composer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.4rem 0.4rem 0.4rem 1rem;
+  border: 1px solid var(--panel-2);
+  border-radius: 22px;
+  background: var(--panel);
+}
+
+.coach__composer:focus-within {
+  border-color: var(--muted);
+}
+
+.coach__input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 1rem;
+  padding: 0.45rem 0;
+}
+
+.coach__input:focus {
+  outline: none;
+}
+
+/* Send: a neutral ivory circle with a dark arrow (no gold). */
+.coach__send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.coach__send:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .stats__history {

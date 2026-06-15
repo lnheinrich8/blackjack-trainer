@@ -1,12 +1,12 @@
-// Site top navigation. Train and Stats are live; Coach (AI) and Settings are
-// roadmap placeholders shown as disabled "soon" items. Drill *modes* (single /
+// Site top navigation. Play, Train, Stats, and Coach are live; Settings is a
+// roadmap placeholder shown as a disabled "soon" item. Drill *modes* (single /
 // multi hand) will live inside the Train page, not as top-level nav.
 
 const NAV_ITEMS = [
     { id: "play", label: "Play", enabled: true },
     { id: "train", label: "Train", enabled: true },
     { id: "stats", label: "Stats", enabled: true },
-    { id: "coach", label: "Coach", enabled: false },
+    { id: "coach", label: "Coach", enabled: true },
     { id: "settings", label: "Settings", enabled: false },
 ];
 

@@ -14,7 +14,7 @@ import {
     STARTING_BANKROLL,
 } from "./state";
 import { decide, PLAYER_TYPES } from "./strategy";
-import { canSplit } from "./engine";
+import { canSplit, handValue } from "./engine";
 import {
     PRESETS,
     DEFAULT_DIFFICULTY,
@@ -241,9 +241,10 @@ function Play({ onRecordBet }) {
     // deal seeds it). In state so the betting-phase seat preview reflects it.
     const [roster, setRoster] = useState(null);
 
-    // The true count a Testing-mode bet was placed at, stashed when the deal
-    // starts and recorded once the round settles. Null when not in Testing mode
-    // (so that round isn't tracked) or once it's been recorded. A ref, not state,
+    // The pre-deal decision context a Testing-mode bet was placed at (count,
+    // bankroll, shoe id, cards left, …), stashed when the deal starts and merged
+    // with the round's outcome once it settles. Null when not in Testing mode (so
+    // that round isn't tracked) or once it's been recorded. A ref, not state,
     // since only effects/callbacks touch it and it shouldn't trigger renders.
     const pendingTcRef = useRef(null);
 
@@ -305,9 +306,10 @@ function Play({ onRecordBet }) {
             // the config modal (one per other player).
             botTypes = behaviorsFor(savedConfig.config);
         }
-        // In Testing mode, stash the true count this bet is being placed at (the
-        // count of everything seen so far, before this round is dealt) so the
-        // round can be folded into the bet-strategy stats once it settles.
+        // In Testing mode, stash the full pre-deal context this bet is being sized
+        // from (the running/true count of everything seen so far, the bankroll, the
+        // shoe id, how many cards are left, the betting unit) so the round can be
+        // folded into the bet-strategy stats — with its outcome — once it settles.
         if (isTestingMode(savedConfig.difficultyId)) {
             const rc = runningCount(
                 state.shoe,
@@ -315,7 +317,15 @@ function Play({ onRecordBet }) {
                 state.dealer,
                 state.dealerHoleHidden,
             );
-            pendingTcRef.current = decks > 0 ? rc / decks : 0;
+            pendingTcRef.current = {
+                shoe: state.shoeId,
+                tc: decks > 0 ? rc / decks : 0,
+                rc,
+                bankroll: state.bankroll,
+                cardsRemaining: state.shoe.length - state.pos,
+                decks,
+                unit: MIN_CHIP,
+            };
         } else {
             pendingTcRef.current = null;
         }
@@ -326,27 +336,51 @@ function Play({ onRecordBet }) {
         savedConfig.difficultyId,
         savedConfig.config,
         state.bet,
+        state.bankroll,
         state.shoe,
         state.pos,
+        state.shoeId,
         state.dealer,
         state.dealerHoleHidden,
         decks,
         roster,
     ]);
 
-    // Once a Testing-mode round settles, record the bet, the count it was placed
-    // at, and the round's net result, then clear the pending count so we record
-    // each round exactly once.
+    // Once a Testing-mode round settles, merge the stashed pre-deal context with
+    // the round's outcome and record it, then clear the pending stash so we record
+    // each round exactly once. A round can hold several user hands after a split:
+    // the scalar fields (playerTotal) describe the first hand, the booleans the
+    // whole round. `doubled` is detected by a hand staking above the base bet, so
+    // it's caught even when the doubled hand then busts.
     useEffect(() => {
         if (state.phase !== "settle" || pendingTcRef.current === null) return;
+        const pending = pendingTcRef.current;
+        const userSeat = state.players[state.userIndex];
+        const hands = userSeat ? userSeat.hands : [];
+        const first = hands[0];
         onRecordBet({
-            tc: pendingTcRef.current,
+            ...pending,
             bet: state.lastBet,
             net: state.lastNet,
-            decks,
+            outcome:
+                state.lastNet > 0 ? "win" : state.lastNet < 0 ? "loss" : "push",
+            playerTotal: first ? handValue(first.cards).total : null,
+            isBlackjack: hands.some((h) => h.status === "blackjack"),
+            busted: hands.length > 0 && hands.every((h) => h.status === "bust"),
+            doubled: hands.some((h) => h.bet > state.lastBet),
+            split: hands.length > 1,
+            dealerUpcard: state.dealer[0] ? state.dealer[0].rank : null,
         });
         pendingTcRef.current = null;
-    }, [state.phase, state.lastBet, state.lastNet, onRecordBet, decks]);
+    }, [
+        state.phase,
+        state.lastBet,
+        state.lastNet,
+        state.players,
+        state.userIndex,
+        state.dealer,
+        onRecordBet,
+    ]);
 
     // Keyboard controls. Spacebar deals / advances; during betting 1-5 add a chip
     // (Shift+1-5 removes one); during the player's turn Z=hit, X=stand, C=double,

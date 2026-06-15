@@ -18,13 +18,14 @@ export const TC_BUCKETS = [
 // Below this many tracked hands the ramp grade isn't meaningful yet.
 const MIN_HANDS_FOR_GRADE = 10;
 
-const sum = (xs) => xs.reduce((a, b) => a + b, 0);
-const mean = (xs) => (xs.length === 0 ? 0 : sum(xs) / xs.length);
+export const sum = (xs) => xs.reduce((a, b) => a + b, 0);
+export const mean = (xs) => (xs.length === 0 ? 0 : sum(xs) / xs.length);
 
 // Pearson correlation between two equal-length series, or null when it's
 // undefined (fewer than two points, or one series never varies — e.g. the player
-// flat-bets, so bet has no spread to correlate with the count).
-function pearson(xs, ys) {
+// flat-bets, so bet has no spread to correlate with the count). Shared with the
+// coach's deeper per-shoe analysis (betAnalysis.js).
+export function pearson(xs, ys) {
     if (xs.length < 2) return null;
     const mx = mean(xs);
     const my = mean(ys);

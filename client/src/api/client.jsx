@@ -24,3 +24,11 @@ export const gradeGuess = (sequence, guessedCount) =>
 // body: { numDecks }  ->  response: { sequence: [{ rank, suit }] } (52 * numDecks)
 export const getShoe = (numDecks) =>
   api.post("/play/shoe", { numDecks }).then((r) => r.data);
+
+// POST /api/coach/chat — chat with the local-LLM coach. Sends the conversation so
+// far plus the freshly computed bet analysis (so replies are grounded in the
+// player's stats). body: { analysis, messages: [{ role, content }] } -> { reply }.
+// No client timeout since local model inference can take several seconds (the
+// server caps the wait).
+export const postCoachChat = (analysis, messages) =>
+  api.post("/coach/chat", { analysis, messages }).then((r) => r.data);

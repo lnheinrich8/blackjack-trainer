@@ -59,22 +59,29 @@ export function seatLayout(numPlayers) {
 
 // --- state shape ---
 // {
-//   phase, shoe, pos, bankroll, bet, betChips, lastBet,
+//   phase, shoe, pos, shoeId, bankroll, bet, betChips, lastBet,
 //   players: [{ id, kind: 'user'|'npc', type, hands: [{ cards, bet, status, outcome, payout }] }],
 //   userIndex,         // index of the user's seat in players
 //   active: { p, h },  // seat index + hand index currently being played
 //   dealer,            // dealer's cards (hole = dealer[1])
+//   shoeId,            // increments on each reshuffle; tags rounds by physical shoe for bet analysis
 //   dealStep,          // how many opening cards have been dealt
 //   dealerHoleHidden,  // render dealer[1] face-down until the dealer's turn
 //   lastNet,           // net chips from the user's last settled round (for the banner)
 // }
 // Hand status: playing | stood | bust | doubled | blackjack.
 
-export function init({ bankroll = STARTING_BANKROLL, shoe = [], pos = 0 } = {}) {
+export function init({
+    bankroll = STARTING_BANKROLL,
+    shoe = [],
+    pos = 0,
+    shoeId = 0,
+} = {}) {
     return {
         phase: "betting",
         shoe,
         pos,
+        shoeId,
         bankroll,
         bet: 0,
         betChips: [], // chip values placed for the current bet, for the table display
@@ -256,13 +263,16 @@ function advance(state) {
 export function reducer(state, action) {
     switch (action.type) {
         // Load a fresh shoe (initial fetch and every reshuffle both use this).
+        // Each is a new physical shoe, so bump shoeId to group rounds by shoe.
         case "RESHUFFLE":
-            return { ...state, shoe: action.shoe, pos: 0 };
+            return { ...state, shoe: action.shoe, pos: 0, shoeId: state.shoeId + 1 };
 
         // Settings changed — start a fresh betting round with an empty shoe so the
-        // next hand is dealt under the new deck/seat config. Bankroll is preserved.
+        // next hand is dealt under the new deck/seat config. Bankroll is preserved,
+        // and shoeId keeps counting (the next RESHUFFLE bumps it) so a config change
+        // can't collide two different shoes onto the same id.
         case "CONFIGURE":
-            return init({ bankroll: state.bankroll });
+            return init({ bankroll: state.bankroll, shoeId: state.shoeId });
 
         // ---- betting ----
 
