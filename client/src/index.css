@@ -79,6 +79,25 @@ h3,
   flex-direction: column;
 }
 
+/* The Coach page is a full-viewport chat: pin the shell to the viewport height so
+   the transcript scrolls internally (and the composer stays put) instead of the
+   whole window scrolling. Only applied for that page so other pages still grow and
+   scroll the window normally. */
+.site--fixed {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* On the Coach page, let the main area span the full width so the chat's
+   scrollbar sits at the window edge (content stays centered via .coach__inner).
+   Vertical padding is kept; only the horizontal cap/padding is dropped. */
+.site--fixed .site__main {
+  max-width: none;
+  padding-top: 0; /* chat meets the menubar bottom edge — no gap above the scroll area */
+  padding-left: 0;
+  padding-right: 0;
+}
+
 /* ---- top nav ---- */
 .topnav {
   position: sticky;
@@ -465,37 +484,54 @@ h3,
 .coach-page {
   flex: 1; /* fill the main area so the transcript scrolls and the composer pins */
   min-height: 0;
-  width: 100%;
-  max-width: 768px;
-  margin: 0 auto;
+  width: 100%; /* full width so the chat scrollbar reaches the window edge */
   display: flex;
   flex-direction: column;
   position: relative; /* anchor the floating scroll-to-bottom button */
 }
 
-.coach__header {
-  padding-bottom: 0.85rem;
-  border-bottom: 1px solid var(--panel-2);
+/* Centered content column shared by the header, message thread, and composer, so
+   they line up at 768px while the scroll container itself spans the full width. */
+.coach__inner {
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
 }
 
-.coach__title {
-  margin: 0;
-}
-
-.coach__tagline {
-  margin: 0.3rem 0 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
+/* Full-width scroll container: its scrollbar sits at the window edge (styled to
+   match the page scrollbar — thin, transparent track, just a thumb). */
 .coach__chat {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-2) transparent;
+}
+
+.coach__chat::-webkit-scrollbar {
+  width: 10px;
+}
+
+.coach__chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.coach__chat::-webkit-scrollbar-thumb {
+  background: var(--panel-2);
+  border-radius: 5px;
+}
+
+/* The centered message column inside the full-width scroller. min-height fills the
+   chat area so the empty-state placeholder can center vertically. */
+.coach__thread {
+  min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 1.4rem;
-  padding: 1.5rem 0.25rem;
+  padding-top: 1.5rem;
+  padding-bottom: 1.5rem;
 }
 
 /* Empty state, centered in the transcript area. */
@@ -563,7 +599,7 @@ h3,
   height: 34px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--panel-2);
+  border: 1px solid var(--accent);
   border-radius: 50%;
   background: var(--panel);
   color: var(--text);
@@ -609,6 +645,7 @@ h3,
 }
 
 /* Send: a neutral ivory circle with a dark arrow (no gold). */
+/* Default = nothing to send: a solid darker gray circle. */
 .coach__send {
   flex: none;
   width: 36px;
@@ -617,17 +654,19 @@ h3,
   place-items: center;
   border: none;
   border-radius: 50%;
-  background: var(--text);
+  background: #61675c;
   color: var(--bg);
   font-size: 1.15rem;
   line-height: 1;
-  cursor: pointer;
-  transition: opacity 0.15s ease;
+  cursor: default;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
-.coach__send:disabled {
-  opacity: 0.35;
-  cursor: default;
+/* Can send: turns yellow with a black arrow. */
+.coach__send:enabled {
+  background: var(--accent);
+  color: var(--ink);
+  cursor: pointer;
 }
 
 .stats__history {

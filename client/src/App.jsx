@@ -61,7 +61,7 @@ function App() {
             : `${Math.round((stats.totalCorrect / stats.totalDrills) * 100)}%`;
 
     return (
-        <div className="site">
+        <div className={`site${section === "coach" ? " site--fixed" : ""}`}>
             <TopNav
                 active={section}
                 onSelect={setSection}

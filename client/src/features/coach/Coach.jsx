@@ -63,37 +63,32 @@ function Coach({ betStats }) {
 
     return (
         <div className="coach-page">
-            <header className="coach__header">
-                <h2 className="coach__title">AI coach</h2>
-                <p className="coach__tagline">
-                    Chat about your strategy — it knows your Testing-mode bet stats.
-                </p>
-            </header>
-
             <div className="coach__chat" ref={scrollRef} onScroll={handleScroll}>
-                {messages.length === 0 && (
-                    <div className="coach__placeholder">
-                        <p className="coach__placeholder-lead">
-                            Ask anything about your blackjack betting.
-                        </p>
-                        <p className="coach__examples">
-                            “How’s my bet ramp?” · “What should I fix first?” · “When
-                            should I spread my bets up?”
-                        </p>
-                    </div>
-                )}
+                <div className="coach__inner coach__thread">
+                    {messages.length === 0 && (
+                        <div className="coach__placeholder">
+                            <p className="coach__placeholder-lead">
+                                Ask anything about your blackjack betting.
+                            </p>
+                            <p className="coach__examples">
+                                “How’s my bet ramp?” · “What should I fix first?” · “When
+                                should I spread my bets up?”
+                            </p>
+                        </div>
+                    )}
 
-                {messages.map((m, i) => (
-                    <div key={i} className={`coach__msg coach__msg--${m.role}`}>
-                        {m.content}
-                    </div>
-                ))}
+                    {messages.map((m, i) => (
+                        <div key={i} className={`coach__msg coach__msg--${m.role}`}>
+                            {m.content}
+                        </div>
+                    ))}
 
-                {loading && (
-                    <div className="coach__msg coach__msg--assistant coach__msg--pending">
-                        Thinking…
-                    </div>
-                )}
+                    {loading && (
+                        <div className="coach__msg coach__msg--assistant coach__msg--pending">
+                            Thinking…
+                        </div>
+                    )}
+                </div>
             </div>
 
             {!atBottom && (
@@ -107,26 +102,27 @@ function Coach({ betStats }) {
                 </button>
             )}
 
-            {error && <p className="coach__error">{error}</p>}
+            <div className="coach__inner">
+                {error && <p className="coach__error">{error}</p>}
 
-            <form className="coach__composer" onSubmit={send}>
-                <input
-                    className="coach__input"
-                    type="text"
-                    value={input}
-                    placeholder="Message your coach…"
-                    onChange={(e) => setInput(e.target.value)}
-                    disabled={loading}
-                />
-                <button
-                    className="coach__send"
-                    type="submit"
-                    disabled={loading || !input.trim()}
-                    aria-label="Send"
-                >
-                    ↑
-                </button>
-            </form>
+                <form className="coach__composer" onSubmit={send}>
+                    <input
+                        className="coach__input"
+                        type="text"
+                        value={input}
+                        placeholder="Message your coach…"
+                        onChange={(e) => setInput(e.target.value)}
+                    />
+                    <button
+                        className="coach__send"
+                        type="submit"
+                        disabled={loading || !input.trim()}
+                        aria-label="Send"
+                    >
+                        ↑
+                    </button>
+                </form>
+            </div>
         </div>
     );
 }
